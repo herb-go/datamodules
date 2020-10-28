@@ -3,21 +3,15 @@ package rcache
 import (
 	"time"
 
+	"github.com/herb-go/herbdata"
+
 	"github.com/herb-go/herbdata/datautil"
 )
 
 type Engine struct {
-	versionGenerator func() (string, error)
-	versionstore     VersionStore
-	driver           Driver
-}
-
-func (e *Engine) NewCache(path []byte, irrevocable bool) *Cache {
-	return &Cache{
-		Path:        path,
-		irrevocable: irrevocable,
-		engine:      e,
-	}
+	VersionGenerator func() (string, error)
+	Store            herbdata.Cache
+	VersionStore     herbdata.Store
 }
 
 var DefaultVersionbGenerator = func() (string, error) {
@@ -30,6 +24,6 @@ var DefaultVersionbGenerator = func() (string, error) {
 
 func NewEngine() *Engine {
 	return &Engine{
-		versionGenerator: DefaultVersionbGenerator,
+		VersionGenerator: DefaultVersionbGenerator,
 	}
 }

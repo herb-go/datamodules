@@ -4,13 +4,35 @@ import (
 	"bytes"
 	"time"
 
+	"github.com/herb-go/herbdata/dataencoding"
+
 	"github.com/herb-go/herbdata/datautil"
 	"github.com/herb-go/herbdata/kvdb"
 )
 
+type CachePathPrefix []byte
+
+func (p CachePathPrefix) Join(pathlist ...[]byte) []byte {
+	buf := bytes.NewBuffer(nil)
+	_, err := buf.Write(p)
+	if err != nil {
+		panic(err)
+	}
+	err = datautil.PackTo(buf, nil, pathlist...)
+	if err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
+}
+
+var CachePathPrefixValue = CachePathPrefix([]byte{0})
+var CachePathPrefixVersion = CachePathPrefix([]byte{1})
+
 type Cache struct {
-	Path        []byte
+	path        []byte
+	ttl         time.Duration
 	irrevocable bool
+	encoding    *dataencoding.Encoding
 	engine      *Engine
 }
 
@@ -18,11 +40,11 @@ func (c *Cache) Irrevocable() bool {
 	return c.irrevocable
 }
 func (c *Cache) Revoke() error {
-	v, err := c.engine.versionGenerator()
+	v, err := c.engine.VersionGenerator()
 	if err != nil {
 		return err
 	}
-	return c.engine.versionstore.SetVersion(c.Path, []byte(v))
+	return c.engine.VersionStore.Set(CachePathPrefixVersion.Join(c.path), []byte(v))
 }
 func (c *Cache) Get(key []byte) ([]byte, error) {
 	var data []byte
@@ -35,12 +57,12 @@ func (c *Cache) Get(key []byte) ([]byte, error) {
 	}
 	if !c.irrevocable {
 		revocable = true
-		version, err = c.engine.versionstore.GetVersion(c.Path)
+		version, err = c.engine.VersionStore.Get(CachePathPrefixVersion.Join(c.path))
 		if err != nil {
 			return nil, err
 		}
 	}
-	data, err = c.engine.driver.Get(datautil.Join(nil, c.Path, key))
+	data, err = c.engine.Store.Get(CachePathPrefixValue.Join(c.path, key))
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +76,9 @@ func (c *Cache) Get(key []byte) ([]byte, error) {
 	return e.data, nil
 
 }
-
+func (c *Cache) Set(key []byte, data []byte) error {
+	return c.SetWithTTL(key, data, c.ttl)
+}
 func (c *Cache) SetWithTTL(key []byte, data []byte, ttl time.Duration) error {
 	var version []byte
 	var revocable bool
@@ -62,7 +86,7 @@ func (c *Cache) SetWithTTL(key []byte, data []byte, ttl time.Duration) error {
 	var e *enity
 	if !c.irrevocable {
 		revocable = true
-		version, err = c.engine.versionstore.GetVersion(c.Path)
+		version, err = c.engine.VersionStore.Get(CachePathPrefixVersion.Join(c.path))
 		if err != nil {
 			return err
 		}
@@ -73,16 +97,63 @@ func (c *Cache) SetWithTTL(key []byte, data []byte, ttl time.Duration) error {
 	if err != nil {
 		return err
 	}
-	return c.engine.driver.SetWithTTL(datautil.Join(nil, c.Path, key), buf.Bytes(), ttl)
+	return c.engine.Store.SetWithTTL(CachePathPrefixValue.Join(c.path, key), buf.Bytes(), ttl)
 }
 
 func (c *Cache) Del(key []byte) error {
-	return c.engine.driver.Del(datautil.Join(c.Path, key))
+	return c.engine.Store.Del(CachePathPrefixValue.Join(c.path, key))
 }
-func (c *Cache) NewCache(path []byte, irrevocable bool) *Cache {
+
+func (c *Cache) Clone() *Cache {
 	return &Cache{
-		Path:        datautil.Join(c.Path, path),
-		irrevocable: irrevocable,
+		path:        c.path,
+		ttl:         c.ttl,
+		irrevocable: c.irrevocable,
 		engine:      c.engine,
+		encoding:    c.encoding,
 	}
+}
+
+func (c *Cache) Child(path []byte) *Cache {
+	cc := c.Clone()
+	cc.path = datautil.Join(c.path, path)
+	return cc
+}
+
+func (c *Cache) WithIrrevocable(irrevocable bool) *Cache {
+	cc := c.Clone()
+	cc.irrevocable = irrevocable
+	return cc
+}
+func (c *Cache) WithPath(path []byte) *Cache {
+	cc := c.Clone()
+	cc.path = path
+	return cc
+}
+
+func (c *Cache) WithEngine(engine *Engine) *Cache {
+	cc := c.Clone()
+	cc.engine = engine
+	return cc
+}
+
+func (c *Cache) WithTTL(ttl time.Duration) *Cache {
+	cc := c.Clone()
+	cc.ttl = ttl
+	return cc
+}
+func (c *Cache) WithEncoding(e *dataencoding.Encoding) *Cache {
+	cc := c.Clone()
+	cc.encoding = e
+	return cc
+}
+func (c *Cache) CopyFrom(src *Cache) {
+	c.path = src.path
+	c.ttl = src.ttl
+	c.irrevocable = src.irrevocable
+	c.engine = src.engine
+}
+
+func New() *Cache {
+	return &Cache{}
 }
