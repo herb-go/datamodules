@@ -103,7 +103,6 @@ func (c *Cache) SetWithTTL(key []byte, data []byte, ttl time.Duration) error {
 func (c *Cache) Del(key []byte) error {
 	return c.engine.Store.Del(CachePathPrefixValue.Join(c.path, key))
 }
-
 func (c *Cache) Clone() *Cache {
 	return &Cache{
 		path:        c.path,
@@ -152,6 +151,19 @@ func (c *Cache) CopyFrom(src *Cache) {
 	c.ttl = src.ttl
 	c.irrevocable = src.irrevocable
 	c.engine = src.engine
+}
+
+func (c *Cache) RLock(key []byte) {
+	c.engine.lockerMap.RLock(string(key))
+}
+func (c *Cache) RUnlock(key []byte) {
+	c.engine.lockerMap.RUnlock(string(key))
+}
+func (c *Cache) Lock(key []byte) {
+	c.engine.lockerMap.Lock(string(key))
+}
+func (c *Cache) Unlock(key []byte) {
+	c.engine.lockerMap.Unlock(string(key))
 }
 
 func New() *Cache {
