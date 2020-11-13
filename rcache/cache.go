@@ -2,12 +2,10 @@ package rcache
 
 import (
 	"bytes"
-	"time"
 
+	"github.com/herb-go/herbdata"
 	"github.com/herb-go/herbdata/dataencoding"
-
 	"github.com/herb-go/herbdata/datautil"
-	"github.com/herb-go/herbdata/kvdb"
 )
 
 type CachePathPrefix []byte
@@ -30,7 +28,7 @@ var CachePathPrefixVersion = CachePathPrefix([]byte{1})
 
 type Cache struct {
 	path        []byte
-	ttl         time.Duration
+	ttl         int64
 	irrevocable bool
 	encoding    *dataencoding.Encoding
 	engine      *Engine
@@ -53,7 +51,7 @@ func (c *Cache) Get(key []byte) ([]byte, error) {
 	var err error
 	var e *enity
 	if len(key) == 0 {
-		return nil, kvdb.ErrInvalidateKey
+		return nil, herbdata.ErrInvalidatedKey
 	}
 	if !c.irrevocable {
 		revocable = true
@@ -69,7 +67,7 @@ func (c *Cache) Get(key []byte) ([]byte, error) {
 	e, err = loadEnity(data, revocable, version)
 	if err != nil {
 		if err == ErrEnityTypecodeNotMatch || err == ErrEnityVersionNotMatch {
-			return nil, kvdb.ErrKeyNotFound
+			return nil, herbdata.ErrNotFound
 		}
 		return nil, err
 	}
@@ -79,7 +77,7 @@ func (c *Cache) Get(key []byte) ([]byte, error) {
 func (c *Cache) Set(key []byte, data []byte) error {
 	return c.SetWithTTL(key, data, c.ttl)
 }
-func (c *Cache) SetWithTTL(key []byte, data []byte, ttl time.Duration) error {
+func (c *Cache) SetWithTTL(key []byte, data []byte, ttl int64) error {
 	var version []byte
 	var revocable bool
 	var err error
@@ -101,7 +99,7 @@ func (c *Cache) SetWithTTL(key []byte, data []byte, ttl time.Duration) error {
 }
 
 func (c *Cache) Del(key []byte) error {
-	return c.engine.Store.Del(CachePathPrefixValue.Join(c.path, key))
+	return c.engine.Store.Delete(CachePathPrefixValue.Join(c.path, key))
 }
 func (c *Cache) Clone() *Cache {
 	return &Cache{
@@ -136,7 +134,7 @@ func (c *Cache) WithEngine(engine *Engine) *Cache {
 	return cc
 }
 
-func (c *Cache) WithTTL(ttl time.Duration) *Cache {
+func (c *Cache) WithTTL(ttl int64) *Cache {
 	cc := c.Clone()
 	cc.ttl = ttl
 	return cc
