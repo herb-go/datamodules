@@ -38,6 +38,9 @@ func (c *Cache) Irrevocable() bool {
 	return c.irrevocable
 }
 func (c *Cache) Revoke() error {
+	if c.irrevocable {
+		return ErrCacheIrrevocable
+	}
 	v, err := c.engine.VersionGenerator()
 	if err != nil {
 		return err
@@ -50,14 +53,15 @@ func (c *Cache) Get(key []byte) ([]byte, error) {
 	var revocable bool
 	var err error
 	var e *enity
-	if len(key) == 0 {
-		return nil, herbdata.ErrInvalidatedKey
-	}
 	if !c.irrevocable {
 		revocable = true
 		version, err = c.engine.VersionStore.Get(CachePathPrefixVersion.Join(c.path))
 		if err != nil {
-			return nil, err
+			if err == herbdata.ErrNotFound {
+				version = []byte{}
+			} else {
+				return nil, err
+			}
 		}
 	}
 	data, err = c.engine.Store.Get(CachePathPrefixValue.Join(c.path, key))
@@ -86,7 +90,11 @@ func (c *Cache) SetWithTTL(key []byte, data []byte, ttl int64) error {
 		revocable = true
 		version, err = c.engine.VersionStore.Get(CachePathPrefixVersion.Join(c.path))
 		if err != nil {
-			return err
+			if err == herbdata.ErrNotFound {
+				version = []byte{}
+			} else {
+				return err
+			}
 		}
 	}
 	e = createEnity(revocable, version, data)
@@ -98,7 +106,7 @@ func (c *Cache) SetWithTTL(key []byte, data []byte, ttl int64) error {
 	return c.engine.Store.SetWithTTL(CachePathPrefixValue.Join(c.path, key), buf.Bytes(), ttl)
 }
 
-func (c *Cache) Del(key []byte) error {
+func (c *Cache) Delete(key []byte) error {
 	return c.engine.Store.Delete(CachePathPrefixValue.Join(c.path, key))
 }
 func (c *Cache) Clone() *Cache {
@@ -148,6 +156,7 @@ func (c *Cache) CopyFrom(src *Cache) {
 	c.path = src.path
 	c.ttl = src.ttl
 	c.irrevocable = src.irrevocable
+	c.encoding = src.encoding
 	c.engine = src.engine
 }
 
