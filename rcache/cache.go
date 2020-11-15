@@ -121,7 +121,7 @@ func (c *Cache) Clone() *Cache {
 
 func (c *Cache) Child(path []byte) *Cache {
 	cc := c.Clone()
-	cc.path = datautil.Join(c.path, path)
+	cc.path = datautil.Append(c.path, nil, path)
 	return cc
 }
 
@@ -159,7 +159,16 @@ func (c *Cache) CopyFrom(src *Cache) {
 	c.encoding = src.encoding
 	c.engine = src.engine
 }
-
+func (c *Cache) Equal(dst *Cache) bool {
+	if dst == nil || c == nil {
+		return dst == nil && c == nil
+	}
+	return bytes.Compare(c.path, dst.path) == 0 &&
+		c.ttl == dst.ttl &&
+		c.irrevocable == dst.irrevocable &&
+		c.encoding == dst.encoding &&
+		c.engine == dst.engine
+}
 func (c *Cache) RLock(key []byte) {
 	c.engine.lockerMap.RLock(string(key))
 }

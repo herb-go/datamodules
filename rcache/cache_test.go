@@ -9,6 +9,7 @@ import (
 	"github.com/herb-go/herbdata"
 
 	"github.com/herb-go/herbdata-drivers/kvdb-drivers/freecachedb"
+	"github.com/herb-go/herbdata/dataencoding/jsonencoding"
 	"github.com/herb-go/herbdata/kvdb/commonkvdb"
 )
 
@@ -23,6 +24,7 @@ func newTestCache() *Cache {
 		panic(err)
 	}
 	e.Store = d
+	c.encoding = jsonencoding.Encoding
 	return c.WithEngine(e)
 }
 
@@ -227,5 +229,72 @@ func TestLocker(t *testing.T) {
 	wg.Wait()
 	if result != "312" {
 		t.Fatal(result)
+	}
+}
+
+func TestCacheOperations(t *testing.T) {
+	var cc *Cache
+	c := newTestCache()
+	c.ttl = 200
+	c.path = []byte("path")
+	if c.Equal(nil) {
+		t.Fatal(c)
+	}
+	if !cc.Equal(nil) {
+		t.Fatal(cc)
+	}
+	cc = c.Clone()
+	if !cc.Equal(cc) {
+		t.Fatal(cc)
+	}
+	cc.ttl = 100
+	if c.ttl != 200 {
+		t.Fatal(c.ttl)
+	}
+	cc = c.WithPath([]byte("newpath"))
+	if bytes.Compare(cc.path, []byte("newpath")) != 0 {
+		t.Fatal(cc)
+	}
+	if bytes.Compare(c.path, []byte("path")) != 0 {
+		t.Fatal(c)
+	}
+	cc = c.Child([]byte("child"))
+	if bytes.Compare(cc.path, []byte("path")) == 0 || bytes.Compare(cc.path[:len([]byte("path"))], []byte("path")) != 0 {
+		t.Fatal(cc)
+	}
+	if bytes.Compare(c.path, []byte("path")) != 0 {
+		t.Fatal(c)
+	}
+	cc = c.WithTTL(500)
+	if cc.ttl != 500 || c.ttl != 200 {
+		t.Fatal(cc, c)
+	}
+	cc = c.WithIrrevocable(true)
+	if cc.irrevocable != true || c.irrevocable != false {
+		t.Fatal(cc, c)
+	}
+	cc = c.WithEncoding(nil)
+	if cc.encoding != nil || c.encoding == nil {
+		t.Fatal(cc, c)
+	}
+	cc = c.WithEngine(nil)
+	if cc.engine != nil || c.engine == nil {
+		t.Fatal(cc, c)
+	}
+	cc = c.WithPath([]byte("newpath")).WithTTL(500).WithIrrevocable(true).WithEncoding(nil).WithEngine(nil)
+	if bytes.Compare(c.path, []byte("path")) != 0 ||
+		c.ttl != 200 ||
+		c.irrevocable != false ||
+		c.encoding == nil ||
+		c.engine == nil {
+		t.Fatal(c)
+	}
+	c.CopyFrom(cc)
+	if bytes.Compare(c.path, []byte("newpath")) != 0 ||
+		c.ttl != 500 ||
+		c.irrevocable == false ||
+		c.encoding != nil ||
+		c.engine != nil {
+		t.Fatal(c)
 	}
 }
