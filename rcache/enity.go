@@ -50,7 +50,7 @@ func createEnity(revocable bool, version []byte, data []byte) *enity {
 func loadEnity(data []byte, revocable bool, version []byte) (*enity, error) {
 	datalength := len(data)
 	if datalength == 0 {
-		return nil, ErrUnresolvedCacheEnity
+		return nil, ErrUnresolvableCacheEnity
 	}
 	switch data[0] {
 	case enityTypecodeIrrevocable:
@@ -73,5 +73,5 @@ func loadEnity(data []byte, revocable bool, version []byte) (*enity, error) {
 		}
 		return createEnity(false, versiondata, buf.Bytes()), nil
 	}
-	return nil, ErrUnresolvedCacheEnity
+	return nil, ErrUnresolvableCacheEnity
 }
