@@ -2,30 +2,45 @@ package rcache
 
 import (
 	"bytes"
+	"encoding/json"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/herb-go/herbdata"
 
-	"github.com/herb-go/herbdata-drivers/kvdb-drivers/freecachedb"
+	_ "github.com/herb-go/herbdata-drivers/kvdb-drivers/freecachedb"
 	"github.com/herb-go/herbdata/dataencoding/jsonencoding"
-	"github.com/herb-go/herbdata/kvdb/commonkvdb"
+	"github.com/herb-go/herbdata/kvdb"
+	_ "github.com/herb-go/herbdata/kvdb/commonkvdb"
 )
 
 var _ herbdata.Cache = New()
 
 func newTestCache() *Cache {
 	c := New()
-	e := NewEngine()
-	e.VersionStore = commonkvdb.NewInMemory()
-	d, err := (&freecachedb.Config{Size: 50000}).CreateDriver()
+	config := &Config{
+		Config: &kvdb.Config{
+			Driver: "freecache",
+			Config: func(v interface{}) error {
+				return json.Unmarshal([]byte(`{"Size":50000}`), v)
+			},
+		},
+		VersionStore: &kvdb.Config{
+			Driver: "inmemory",
+		},
+	}
+
+	err := config.ApplyTo(c)
 	if err != nil {
 		panic(err)
 	}
-	e.Store = d
 	c.encoding = jsonencoding.Encoding
-	return c.WithEngine(e)
+	err = c.Start()
+	if err != nil {
+		panic(err)
+	}
+	return c
 }
 
 var TestKey = []byte("testkey")
@@ -37,6 +52,7 @@ func TestCache(t *testing.T) {
 	var err error
 	var data []byte
 	c := newTestCache()
+	defer c.Stop()
 	if c.Irrevocable() {
 		t.Fatal(c.Irrevocable())
 	}
@@ -121,6 +137,7 @@ func TestIrrevocableCache(t *testing.T) {
 	var err error
 	var data []byte
 	c := newTestCache().WithIrrevocable(true)
+	defer c.Stop()
 	if !c.Irrevocable() {
 		t.Fatal(c.Irrevocable())
 	}
@@ -181,6 +198,7 @@ func TestSet(t *testing.T) {
 	var err error
 	var data []byte
 	c := newTestCache().WithTTL(1)
+	defer c.Stop()
 	err = c.Set(TestKey, TestData)
 	if err != nil {
 		t.Fatal(err)
@@ -202,6 +220,7 @@ func TestSet(t *testing.T) {
 func TestLocker(t *testing.T) {
 	var result = ""
 	c := newTestCache()
+	defer c.Stop()
 	c2 := c.Child([]byte("c2"))
 	wg := sync.WaitGroup{}
 	wg.Add(3)
@@ -235,6 +254,8 @@ func TestLocker(t *testing.T) {
 func TestCacheOperations(t *testing.T) {
 	var cc *Cache
 	c := newTestCache()
+	e := c.engine
+	defer e.Stop()
 	c.ttl = 200
 	c.path = []byte("path")
 	if c.Equal(nil) {

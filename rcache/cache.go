@@ -181,7 +181,12 @@ func (c *Cache) Lock(key []byte) {
 func (c *Cache) Unlock(key []byte) {
 	c.engine.lockerMap.Unlock(string(key))
 }
-
+func (c *Cache) Start() error {
+	return c.engine.Start()
+}
+func (c *Cache) Stop() error {
+	return c.engine.Stop()
+}
 func New() *Cache {
 	return &Cache{}
 }

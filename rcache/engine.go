@@ -10,9 +10,28 @@ import (
 
 type Engine struct {
 	VersionGenerator func() (string, error)
-	Store            herbdata.Cache
-	VersionStore     herbdata.Store
+	Store            herbdata.CacheStarter
+	VersionStore     herbdata.StoreStarter
 	lockerMap        *datautil.LockerMap
+}
+
+func (e *Engine) Start() error {
+	if e.VersionStore != nil {
+		err := e.VersionStore.Start()
+		if err != nil {
+			return err
+		}
+	}
+	return e.Store.Start()
+}
+func (e *Engine) Stop() error {
+	if e.VersionStore != nil {
+		err := e.VersionStore.Stop()
+		if err != nil {
+			return err
+		}
+	}
+	return e.Store.Stop()
 }
 
 var DefaultVersionbGenerator = func() (string, error) {
