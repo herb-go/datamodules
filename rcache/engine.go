@@ -10,8 +10,8 @@ import (
 
 type Engine struct {
 	VersionGenerator func() (string, error)
-	Store            herbdata.CacheStarter
-	VersionStore     herbdata.StoreStarter
+	Store            herbdata.CacheServer
+	VersionStore     herbdata.StoreServer
 	lockerMap        *datautil.LockerMap
 }
 
