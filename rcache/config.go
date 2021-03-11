@@ -5,7 +5,7 @@ import (
 )
 
 type Config struct {
-	*kvdb.Config
+	Store        *kvdb.Config
 	TTL          int64
 	Prefix       string
 	VersionStore *kvdb.Config
@@ -16,7 +16,7 @@ func (c *Config) ApplyTo(cache *Cache) error {
 	var err error
 	e := NewEngine()
 	db := kvdb.New()
-	err = c.Config.ApplyTo(db)
+	err = c.Store.ApplyTo(db)
 	if err != nil {
 		return err
 	}

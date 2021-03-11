@@ -20,7 +20,7 @@ var _ herbdata.Cache = New()
 func newTestCache() *Cache {
 	c := New()
 	config := &Config{
-		Config: &kvdb.Config{
+		Store: &kvdb.Config{
 			Driver: "freecache",
 			Config: func(v interface{}) error {
 				return json.Unmarshal([]byte(`{"Size":50000}`), v)
@@ -189,7 +189,7 @@ func TestIrrevocableCache(t *testing.T) {
 		t.Fatal(data)
 	}
 	err = c.Revoke()
-	if err != ErrCacheIrrevocable {
+	if err != herbdata.ErrIrrevocable {
 		t.Fatal(err)
 	}
 }
@@ -318,4 +318,58 @@ func TestCacheOperations(t *testing.T) {
 		c.engine != nil {
 		t.Fatal(c)
 	}
+}
+
+func TestNestedCache(t *testing.T) {
+	var err error
+	var data []byte
+	c := newTestCache()
+	defer c.Stop()
+	data, err = c.Child([]byte("testpath"), []byte("testpath2")).Get([]byte("testkey"))
+	if len(data) != 0 || err != herbdata.ErrNotFound {
+		t.Fatal()
+	}
+	child := c.Child([]byte("testpath"))
+	child2 := child.Child([]byte("testpath2"))
+	err = child2.SetWithTTL([]byte("testkey"), []byte("testvalue"), 3600)
+	data, err = c.Child([]byte("testpath"), []byte("testpath2")).Get([]byte("testkey"))
+	if err != nil || string(data) != "testvalue" {
+		t.Fatal()
+	}
+	nestedpath := [][]byte{
+		[]byte("testpath"), []byte("testpath2"),
+	}
+	err = c.SetWithTTLNested([]byte("testkey2"), []byte("testvalue2"), 3600, nestedpath...)
+	if err != nil {
+		panic(err)
+	}
+	data, err = c.GetNested([]byte("testkey2"), nestedpath...)
+	if err != nil || string(data) != "testvalue2" {
+		t.Fatal()
+	}
+	err = c.DeleteNested([]byte("testkey2"), nestedpath...)
+	if err != nil {
+		panic(err)
+	}
+	data, err = c.GetNested([]byte("testkey2"), nestedpath...)
+	if len(data) != 0 || err != herbdata.ErrNotFound {
+		t.Fatal()
+	}
+	err = c.SetWithTTLNested([]byte("testkey2"), []byte("testvalue2"), 3600, nestedpath...)
+	if err != nil {
+		panic(err)
+	}
+	data, err = c.GetNested([]byte("testkey2"), nestedpath...)
+	if err != nil || string(data) != "testvalue2" {
+		t.Fatal()
+	}
+	err = c.RevokeNested(nestedpath...)
+	if err != nil {
+		panic(err)
+	}
+	data, err = c.GetNested([]byte("testkey2"), nestedpath...)
+	if len(data) != 0 || err != herbdata.ErrNotFound {
+		t.Fatal()
+	}
+
 }

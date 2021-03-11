@@ -39,7 +39,7 @@ func (c *Cache) Irrevocable() bool {
 }
 func (c *Cache) Revoke() error {
 	if c.irrevocable {
-		return ErrCacheIrrevocable
+		return herbdata.ErrIrrevocable
 	}
 	v, err := c.engine.VersionGenerator()
 	if err != nil {
@@ -109,6 +109,20 @@ func (c *Cache) SetWithTTL(key []byte, data []byte, ttl int64) error {
 func (c *Cache) Delete(key []byte) error {
 	return c.engine.Store.Delete(CachePathPrefixValue.Join(c.path, key))
 }
+
+func (c *Cache) GetNested(key []byte, path ...[]byte) ([]byte, error) {
+	return c.Child(path...).Get(key)
+}
+func (c *Cache) SetWithTTLNested(key []byte, value []byte, ttl int64, path ...[]byte) error {
+	return c.Child(path...).SetWithTTL(key, value, ttl)
+}
+func (c *Cache) DeleteNested(key []byte, path ...[]byte) error {
+	return c.Child(path...).Delete(key)
+}
+
+func (c *Cache) RevokeNested(path ...[]byte) error {
+	return c.Child(path...).Revoke()
+}
 func (c *Cache) Clone() *Cache {
 	return &Cache{
 		path:        c.path,
@@ -119,9 +133,9 @@ func (c *Cache) Clone() *Cache {
 	}
 }
 
-func (c *Cache) Child(path []byte) *Cache {
+func (c *Cache) Child(path ...[]byte) *Cache {
 	cc := c.Clone()
-	cc.path = datautil.Append(c.path, nil, path)
+	cc.path = datautil.Append(c.path, nil, path...)
 	return cc
 }
 
