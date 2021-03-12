@@ -4,7 +4,6 @@ import (
 	"bytes"
 
 	"github.com/herb-go/herbdata"
-	"github.com/herb-go/herbdata/dataencoding"
 	"github.com/herb-go/herbdata/datautil"
 )
 
@@ -30,7 +29,6 @@ type Cache struct {
 	path        []byte
 	ttl         int64
 	irrevocable bool
-	encoding    *dataencoding.Encoding
 	engine      *Engine
 }
 
@@ -129,7 +127,6 @@ func (c *Cache) Clone() *Cache {
 		ttl:         c.ttl,
 		irrevocable: c.irrevocable,
 		engine:      c.engine,
-		encoding:    c.encoding,
 	}
 }
 
@@ -161,16 +158,11 @@ func (c *Cache) WithTTL(ttl int64) *Cache {
 	cc.ttl = ttl
 	return cc
 }
-func (c *Cache) WithEncoding(e *dataencoding.Encoding) *Cache {
-	cc := c.Clone()
-	cc.encoding = e
-	return cc
-}
+
 func (c *Cache) CopyFrom(src *Cache) {
 	c.path = src.path
 	c.ttl = src.ttl
 	c.irrevocable = src.irrevocable
-	c.encoding = src.encoding
 	c.engine = src.engine
 }
 func (c *Cache) Equal(dst *Cache) bool {
@@ -180,20 +172,7 @@ func (c *Cache) Equal(dst *Cache) bool {
 	return bytes.Compare(c.path, dst.path) == 0 &&
 		c.ttl == dst.ttl &&
 		c.irrevocable == dst.irrevocable &&
-		c.encoding == dst.encoding &&
 		c.engine == dst.engine
-}
-func (c *Cache) RLock(key []byte) {
-	c.engine.lockerMap.RLock(string(key))
-}
-func (c *Cache) RUnlock(key []byte) {
-	c.engine.lockerMap.RUnlock(string(key))
-}
-func (c *Cache) Lock(key []byte) {
-	c.engine.lockerMap.Lock(string(key))
-}
-func (c *Cache) Unlock(key []byte) {
-	c.engine.lockerMap.Unlock(string(key))
 }
 func (c *Cache) Start() error {
 	return c.engine.Start()

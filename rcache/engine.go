@@ -12,7 +12,6 @@ type Engine struct {
 	VersionGenerator func() (string, error)
 	Store            herbdata.CacheServer
 	VersionStore     herbdata.StoreServer
-	lockerMap        *datautil.LockerMap
 }
 
 func (e *Engine) Start() error {
@@ -34,7 +33,7 @@ func (e *Engine) Stop() error {
 	return e.Store.Stop()
 }
 
-var DefaultVersionbGenerator = func() (string, error) {
+var DefaultVersionGenerator = func() (string, error) {
 	v, err := datautil.Encode(uint64(time.Now().UnixNano()))
 	if err != nil {
 		return "", err
@@ -44,7 +43,6 @@ var DefaultVersionbGenerator = func() (string, error) {
 
 func NewEngine() *Engine {
 	return &Engine{
-		VersionGenerator: DefaultVersionbGenerator,
-		lockerMap:        datautil.NewLockerMap(),
+		VersionGenerator: DefaultVersionGenerator,
 	}
 }

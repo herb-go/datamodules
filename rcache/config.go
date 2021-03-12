@@ -7,7 +7,6 @@ import (
 type Config struct {
 	Store        *kvdb.Config
 	TTL          int64
-	Prefix       string
 	VersionStore *kvdb.Config
 	Irrevocable  bool
 }
@@ -30,7 +29,6 @@ func (c *Config) ApplyTo(cache *Cache) error {
 		New().
 			WithEngine(e).
 			WithTTL(c.TTL).
-			WithPath([]byte(c.Prefix)).
 			WithIrrevocable(c.Irrevocable),
 	)
 	return nil

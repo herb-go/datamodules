@@ -3,14 +3,12 @@ package rcache
 import (
 	"bytes"
 	"encoding/json"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/herb-go/herbdata"
 
 	_ "github.com/herb-go/herbdata-drivers/kvdb-drivers/freecachedb"
-	"github.com/herb-go/herbdata/dataencoding/jsonencoding"
 	"github.com/herb-go/herbdata/kvdb"
 	_ "github.com/herb-go/herbdata/kvdb/commonkvdb"
 )
@@ -35,7 +33,6 @@ func newTestCache() *Cache {
 	if err != nil {
 		panic(err)
 	}
-	c.encoding = jsonencoding.Encoding
 	err = c.Start()
 	if err != nil {
 		panic(err)
@@ -217,40 +214,6 @@ func TestSet(t *testing.T) {
 	}
 }
 
-func TestLocker(t *testing.T) {
-	var result = ""
-	c := newTestCache()
-	defer c.Stop()
-	c2 := c.Child([]byte("c2"))
-	wg := sync.WaitGroup{}
-	wg.Add(3)
-	go func() {
-		c.Lock(TestKey)
-		defer c.Unlock(TestKey)
-		time.Sleep(5 * time.Millisecond)
-		result = result + "1"
-		wg.Done()
-	}()
-	go func() {
-		time.Sleep(2 * time.Millisecond)
-		c2.RLock(TestKey)
-		c2.RUnlock(TestKey)
-		result = result + "2"
-		wg.Done()
-	}()
-	go func() {
-		time.Sleep(1 * time.Millisecond)
-		c2.RLock(TestKey2)
-		c2.RUnlock(TestKey2)
-		result = result + "3"
-		wg.Done()
-	}()
-	wg.Wait()
-	if result != "312" {
-		t.Fatal(result)
-	}
-}
-
 func TestCacheOperations(t *testing.T) {
 	var cc *Cache
 	c := newTestCache()
@@ -294,19 +257,14 @@ func TestCacheOperations(t *testing.T) {
 	if cc.irrevocable != true || c.irrevocable != false {
 		t.Fatal(cc, c)
 	}
-	cc = c.WithEncoding(nil)
-	if cc.encoding != nil || c.encoding == nil {
-		t.Fatal(cc, c)
-	}
 	cc = c.WithEngine(nil)
 	if cc.engine != nil || c.engine == nil {
 		t.Fatal(cc, c)
 	}
-	cc = c.WithPath([]byte("newpath")).WithTTL(500).WithIrrevocable(true).WithEncoding(nil).WithEngine(nil)
+	cc = c.WithPath([]byte("newpath")).WithTTL(500).WithIrrevocable(true).WithEngine(nil)
 	if bytes.Compare(c.path, []byte("path")) != 0 ||
 		c.ttl != 200 ||
 		c.irrevocable != false ||
-		c.encoding == nil ||
 		c.engine == nil {
 		t.Fatal(c)
 	}
@@ -314,7 +272,6 @@ func TestCacheOperations(t *testing.T) {
 	if bytes.Compare(c.path, []byte("newpath")) != 0 ||
 		c.ttl != 500 ||
 		c.irrevocable == false ||
-		c.encoding != nil ||
 		c.engine != nil {
 		t.Fatal(c)
 	}
