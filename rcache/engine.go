@@ -3,33 +3,26 @@ package rcache
 import (
 	"time"
 
+	"github.com/herb-go/misc/waitingmap"
+
 	"github.com/herb-go/herbdata"
 
 	"github.com/herb-go/herbdata/datautil"
 )
 
+var DefaultVersionTTL = int64(36000)
+
 type Engine struct {
 	VersionGenerator func() (string, error)
+	VersionTTL       int64
 	Store            herbdata.CacheServer
-	VersionStore     herbdata.StoreServer
+	oncemap          *waitingmap.OnceMap
 }
 
 func (e *Engine) Start() error {
-	if e.VersionStore != nil {
-		err := e.VersionStore.Start()
-		if err != nil {
-			return err
-		}
-	}
 	return e.Store.Start()
 }
 func (e *Engine) Stop() error {
-	if e.VersionStore != nil {
-		err := e.VersionStore.Stop()
-		if err != nil {
-			return err
-		}
-	}
 	return e.Store.Stop()
 }
 
@@ -44,5 +37,6 @@ var DefaultVersionGenerator = func() (string, error) {
 func NewEngine() *Engine {
 	return &Engine{
 		VersionGenerator: DefaultVersionGenerator,
+		oncemap:          waitingmap.NewOnceMap(),
 	}
 }

@@ -26,8 +26,6 @@ var CachePathPrefixValue = CachePathPrefix([]byte{0})
 var CachePathPrefixVersion = CachePathPrefix([]byte{1})
 
 type Cache struct {
-	path        []byte
-	ttl         int64
 	irrevocable bool
 	engine      *Engine
 }
@@ -35,7 +33,22 @@ type Cache struct {
 func (c *Cache) Irrevocable() bool {
 	return c.irrevocable
 }
-func (c *Cache) Revoke() error {
+func (c *Cache) getVersion(namespace []byte) ([]byte, error) {
+	version, err := c.engine.Store.Get(CachePathPrefixVersion.Join(namespace))
+	if err != nil {
+		if err == herbdata.ErrNotFound {
+			return []byte{}, nil
+		}
+		return nil, err
+
+	}
+	return version, nil
+}
+func (c *Cache) setVersion(namespace []byte, version []byte) error {
+	return c.engine.Store.SetWithTTL(CachePathPrefixVersion.Join(namespace), version, c.engine.VersionTTL)
+}
+
+func (c *Cache) RevokeNamespaced(namespace []byte) error {
 	if c.irrevocable {
 		return herbdata.ErrIrrevocable
 	}
@@ -43,9 +56,9 @@ func (c *Cache) Revoke() error {
 	if err != nil {
 		return err
 	}
-	return c.engine.VersionStore.Set(CachePathPrefixVersion.Join(c.path), []byte(v))
+	return c.setVersion(namespace, []byte(v))
 }
-func (c *Cache) Get(key []byte) ([]byte, error) {
+func (c *Cache) GetNamespaced(namespace []byte, key []byte) ([]byte, error) {
 	var data []byte
 	var version []byte
 	var revocable bool
@@ -53,16 +66,12 @@ func (c *Cache) Get(key []byte) ([]byte, error) {
 	var e *enity
 	if !c.irrevocable {
 		revocable = true
-		version, err = c.engine.VersionStore.Get(CachePathPrefixVersion.Join(c.path))
+		version, err = c.getVersion(namespace)
 		if err != nil {
-			if err == herbdata.ErrNotFound {
-				version = []byte{}
-			} else {
-				return nil, err
-			}
+			return nil, err
 		}
 	}
-	data, err = c.engine.Store.Get(CachePathPrefixValue.Join(c.path, key))
+	data, err = c.engine.Store.Get(CachePathPrefixValue.Join(namespace, key))
 	if err != nil {
 		return nil, err
 	}
@@ -76,23 +85,17 @@ func (c *Cache) Get(key []byte) ([]byte, error) {
 	return e.data, nil
 
 }
-func (c *Cache) Set(key []byte, data []byte) error {
-	return c.SetWithTTL(key, data, c.ttl)
-}
-func (c *Cache) SetWithTTL(key []byte, data []byte, ttl int64) error {
+
+func (c *Cache) SetWithTTLNamespaced(namespace []byte, key []byte, data []byte, ttl int64) error {
 	var version []byte
 	var revocable bool
 	var err error
 	var e *enity
 	if !c.irrevocable {
 		revocable = true
-		version, err = c.engine.VersionStore.Get(CachePathPrefixVersion.Join(c.path))
+		version, err = c.getVersion(namespace)
 		if err != nil {
-			if err == herbdata.ErrNotFound {
-				version = []byte{}
-			} else {
-				return err
-			}
+			return err
 		}
 	}
 	e = createEnity(revocable, version, data)
@@ -101,49 +104,23 @@ func (c *Cache) SetWithTTL(key []byte, data []byte, ttl int64) error {
 	if err != nil {
 		return err
 	}
-	return c.engine.Store.SetWithTTL(CachePathPrefixValue.Join(c.path, key), buf.Bytes(), ttl)
+	return c.engine.Store.SetWithTTL(CachePathPrefixValue.Join(namespace, key), buf.Bytes(), ttl)
 }
 
-func (c *Cache) Delete(key []byte) error {
-	return c.engine.Store.Delete(CachePathPrefixValue.Join(c.path, key))
+func (c *Cache) DeleteNamespaced(namespace []byte, key []byte) error {
+	return c.engine.Store.Delete(CachePathPrefixValue.Join(namespace, key))
 }
 
-func (c *Cache) GetNested(key []byte, path ...[]byte) ([]byte, error) {
-	return c.Child(path...).Get(key)
-}
-func (c *Cache) SetWithTTLNested(key []byte, value []byte, ttl int64, path ...[]byte) error {
-	return c.Child(path...).SetWithTTL(key, value, ttl)
-}
-func (c *Cache) DeleteNested(key []byte, path ...[]byte) error {
-	return c.Child(path...).Delete(key)
-}
-
-func (c *Cache) RevokeNested(path ...[]byte) error {
-	return c.Child(path...).Revoke()
-}
 func (c *Cache) Clone() *Cache {
 	return &Cache{
-		path:        c.path,
-		ttl:         c.ttl,
 		irrevocable: c.irrevocable,
 		engine:      c.engine,
 	}
 }
 
-func (c *Cache) Child(path ...[]byte) *Cache {
-	cc := c.Clone()
-	cc.path = datautil.Append(c.path, nil, path...)
-	return cc
-}
-
 func (c *Cache) WithIrrevocable(irrevocable bool) *Cache {
 	cc := c.Clone()
 	cc.irrevocable = irrevocable
-	return cc
-}
-func (c *Cache) WithPath(path []byte) *Cache {
-	cc := c.Clone()
-	cc.path = path
 	return cc
 }
 
@@ -153,15 +130,7 @@ func (c *Cache) WithEngine(engine *Engine) *Cache {
 	return cc
 }
 
-func (c *Cache) WithTTL(ttl int64) *Cache {
-	cc := c.Clone()
-	cc.ttl = ttl
-	return cc
-}
-
 func (c *Cache) CopyFrom(src *Cache) {
-	c.path = src.path
-	c.ttl = src.ttl
 	c.irrevocable = src.irrevocable
 	c.engine = src.engine
 }
@@ -169,9 +138,7 @@ func (c *Cache) Equal(dst *Cache) bool {
 	if dst == nil || c == nil {
 		return dst == nil && c == nil
 	}
-	return bytes.Compare(c.path, dst.path) == 0 &&
-		c.ttl == dst.ttl &&
-		c.irrevocable == dst.irrevocable &&
+	return c.irrevocable == dst.irrevocable &&
 		c.engine == dst.engine
 }
 func (c *Cache) Start() error {

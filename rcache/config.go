@@ -5,10 +5,9 @@ import (
 )
 
 type Config struct {
-	Store        *kvdb.Config
-	TTL          int64
-	VersionStore *kvdb.Config
-	Irrevocable  bool
+	Store       *kvdb.Config
+	VersionTTL  int64
+	Irrevocable bool
 }
 
 func (c *Config) ApplyTo(cache *Cache) error {
@@ -20,15 +19,13 @@ func (c *Config) ApplyTo(cache *Cache) error {
 		return err
 	}
 	e.Store = db
-	if c.VersionStore != nil {
-		vdb := kvdb.New()
-		err = c.VersionStore.ApplyTo(vdb)
-		e.VersionStore = vdb
+	e.VersionTTL = c.VersionTTL
+	if e.VersionTTL == 0 {
+		e.VersionTTL = DefaultVersionTTL
 	}
 	cache.CopyFrom(
 		New().
 			WithEngine(e).
-			WithTTL(c.TTL).
 			WithIrrevocable(c.Irrevocable),
 	)
 	return nil
