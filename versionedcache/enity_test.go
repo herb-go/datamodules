@@ -1,4 +1,4 @@
-package rcache
+package versionedcache
 
 import "testing"
 
