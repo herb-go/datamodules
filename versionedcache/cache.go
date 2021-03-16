@@ -35,15 +35,22 @@ func (c *Cache) Revocable() bool {
 	return c.revocable
 }
 func (c *Cache) getCachedVersion(key []byte) ([]byte, error) {
-	version, err := c.engine.VersionStore.Get(key)
+	version, err := c.engine.Cache.Get(key)
 	if err == nil {
 		return version, nil
 	}
 	if err != herbdata.ErrNotFound {
 		return nil, err
 	}
-	return c.engine.LoadRawVersion(key)
-
+	version, err = c.engine.LoadRawVersion(key)
+	if err != nil {
+		return nil, err
+	}
+	err = c.engine.Cache.SetWithTTL(key, version, c.engine.VersionTTL)
+	if err != nil {
+		return nil, err
+	}
+	return version, nil
 }
 func (c *Cache) getVersion() ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
@@ -75,7 +82,7 @@ func (c *Cache) setVersion(version []byte) error {
 		return err
 	}
 	if cacheable {
-		return c.engine.Store.Delete(key)
+		return c.engine.Cache.Delete(key)
 	}
 	return nil
 }
@@ -112,7 +119,7 @@ func (c *Cache) Get(key []byte) ([]byte, error) {
 			return nil, err
 		}
 	}
-	data, err = c.engine.Store.Get(CachePathPrefixValue.MustJoin(namespace, key))
+	data, err = c.engine.Cache.Get(CachePathPrefixValue.MustJoin(namespace, key))
 	if err != nil {
 		return nil, err
 	}
@@ -144,12 +151,12 @@ func (c *Cache) SetWithTTL(key []byte, data []byte, ttl int64) error {
 	if err != nil {
 		return err
 	}
-	return c.engine.Store.SetWithTTL(CachePathPrefixValue.MustJoin(namespace, key), buf.Bytes(), ttl)
+	return c.engine.Cache.SetWithTTL(CachePathPrefixValue.MustJoin(namespace, key), buf.Bytes(), ttl)
 }
 
 func (c *Cache) Delete(key []byte) error {
 	namespace := c.mustGetNamespace()
-	return c.engine.Store.Delete(CachePathPrefixValue.MustJoin(namespace, key))
+	return c.engine.Cache.Delete(CachePathPrefixValue.MustJoin(namespace, key))
 }
 
 func (c *Cache) Clone() *Cache {

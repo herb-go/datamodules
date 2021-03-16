@@ -12,7 +12,7 @@ type Engine struct {
 	VersionGenerator func() (string, error)
 	VersionTTL       int64
 	VersionStore     herbdata.SetterGetterServer
-	Store            herbdata.CacheServer
+	Cache            herbdata.CacheServer
 }
 
 func (e *Engine) LoadRawVersion(key []byte) ([]byte, error) {
@@ -32,7 +32,7 @@ func (e *Engine) Start() error {
 			return err
 		}
 	}
-	return e.Store.Start()
+	return e.Cache.Start()
 }
 func (e *Engine) Stop() error {
 	var vererr error
@@ -40,7 +40,7 @@ func (e *Engine) Stop() error {
 	if e.VersionStore != nil {
 		vererr = e.VersionStore.Stop()
 	}
-	err = e.Store.Stop()
+	err = e.Cache.Stop()
 	if vererr != nil {
 		return vererr
 	}
