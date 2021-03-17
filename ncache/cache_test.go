@@ -1,4 +1,4 @@
-package versionedcache
+package ncache
 
 import (
 	"bytes"
@@ -13,18 +13,17 @@ import (
 	_ "github.com/herb-go/herbdata/kvdb/commonkvdb"
 )
 
-var _ herbdata.Cache = New()
+var _ herbdata.NestableCache = New()
 
 func newTestCache() *Cache {
 	c := New()
 	config := &Config{
-		Store: &kvdb.Config{
+		Cache: &kvdb.Config{
 			Driver: "freecache",
 			Config: func(v interface{}) error {
 				return json.Unmarshal([]byte(`{"Size":50000}`), v)
 			},
 		},
-		Revocable:  true,
 		VersionTTL: 3600,
 		VersionStore: &kvdb.Config{
 			Driver: "inmemory",
@@ -39,7 +38,7 @@ func newTestCache() *Cache {
 	if err != nil {
 		panic(err)
 	}
-	return c
+	return c.WithRevocable(true)
 }
 
 var TestKey = []byte("testkey")
@@ -425,5 +424,32 @@ func TestNamespace(t *testing.T) {
 	data, err = ctest2.Child([]byte("test3"), []byte("test4")).Get(testkey)
 	if err != herbdata.ErrNotFound {
 		t.Fatal(data, err)
+	}
+	ctestnamespace := c.WithNamesapce([]byte("ns1"), []byte("ns2"), []byte("ns3"))
+	ctestsuffix := c.WithNamesapce([]byte("ns1")).WithSuffix([]byte("ns2"), []byte("ns3"))
+	ctestsuffix2 := c.WithNamesapce([]byte("ns1")).WithSuffix([]byte("ns2")).WithSuffix([]byte("ns3"))
+	ctestsuffix3 := c.WithSuffix([]byte("ns1"), []byte("ns2"), []byte("ns3"))
+	ctestnamespacefail := c.WithNamesapce([]byte("ns1")).WithNamesapce([]byte("ns2"), []byte("ns3"))
+	for _, v := range []*Cache{ctestnamespace, ctestsuffix, ctestsuffix2, ctestsuffix3, ctestnamespacefail} {
+		data, err = v.Get(testkey)
+		if err != herbdata.ErrNotFound {
+			t.Fatal(data, err)
+		}
+	}
+	err = ctestnamespace.SetWithTTL(testkey, []byte("testdata"), 3600)
+	if err != nil {
+		panic(err)
+	}
+	for _, v := range []*Cache{ctestnamespace, ctestsuffix, ctestsuffix2, ctestsuffix3} {
+		data, err = v.Get(testkey)
+		if !bytes.Equal(data, []byte("testdata")) || err != nil {
+			t.Fatal(data, err)
+		}
+	}
+	for _, v := range []*Cache{ctestnamespacefail} {
+		data, err = v.Get(testkey)
+		if err != herbdata.ErrNotFound {
+			t.Fatal(data, err)
+		}
 	}
 }

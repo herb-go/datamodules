@@ -1,4 +1,4 @@
-package versionedcache
+package ncache
 
 import "testing"
 

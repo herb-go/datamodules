@@ -1,4 +1,4 @@
-package versionedcache
+package ncache
 
 import (
 	"bytes"
@@ -6,6 +6,15 @@ import (
 	"github.com/herb-go/herbdata"
 	"github.com/herb-go/herbdata/datautil"
 )
+
+func Join(pathlist ...[]byte) []byte {
+	buf := bytes.NewBuffer(nil)
+	err := datautil.PackTo(buf, nil, pathlist...)
+	if err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
+}
 
 type CachePathPrefix []byte
 
@@ -87,12 +96,7 @@ func (c *Cache) setVersion(version []byte) error {
 	return nil
 }
 func (c *Cache) mustGetNamespace() []byte {
-	buf := bytes.NewBuffer(nil)
-	err := datautil.PackTo(buf, nil, c.NamespaceTree...)
-	if err != nil {
-		panic(err)
-	}
-	return buf.Bytes()
+	return Join(c.NamespaceTree...)
 }
 func (c *Cache) Revoke() error {
 	if !c.revocable {
@@ -171,29 +175,43 @@ func (c *Cache) Clone() *Cache {
 		NamespaceTree: t,
 	}
 }
+func (c *Cache) NamescapedCache(namescape []byte) herbdata.NestableCache {
+	return c.WithNamesapce(namescape)
+}
+func (c *Cache) ChildCache(name []byte) herbdata.NestableCache {
+	return c.Child(name)
+}
 
 func (c *Cache) WithRevocable(revocable bool) *Cache {
 	cc := c.Clone()
 	cc.revocable = revocable
 	return cc
 }
-func (c *Cache) WithSuffix(suffix []byte) *Cache {
-	index := len(c.NamespaceTree) - 1
+func (c *Cache) buildNamespace(prefix []byte, suffixs ...[]byte) {
+	var err error
 	buf := bytes.NewBuffer(nil)
-	_, err := buf.Write(c.NamespaceTree[index])
+	if len(prefix) > 0 {
+		_, err = buf.Write(prefix)
+		if err != nil {
+			panic(err)
+		}
+	}
+	err = datautil.PackTo(buf, nil, suffixs...)
 	if err != nil {
 		panic(err)
 	}
-	err = datautil.PackTo(buf, nil, suffix)
-	if err != nil {
-		panic(err)
-	}
-	return c.WithNamesapce(buf.Bytes())
+	index := len(c.NamespaceTree) - 1
+	c.NamespaceTree[index] = buf.Bytes()
 }
-func (c *Cache) WithNamesapce(namespace []byte) *Cache {
+func (c *Cache) WithSuffix(suffixs ...[]byte) *Cache {
+	index := len(c.NamespaceTree) - 1
 	cc := c.Clone()
-	index := len(cc.NamespaceTree) - 1
-	cc.NamespaceTree[index] = namespace
+	cc.buildNamespace(c.NamespaceTree[index], suffixs...)
+	return cc
+}
+func (c *Cache) WithNamesapce(namespace ...[]byte) *Cache {
+	cc := c.Clone()
+	cc.buildNamespace(nil, namespace...)
 	return cc
 }
 func (c *Cache) Child(name ...[]byte) *Cache {
@@ -234,6 +252,14 @@ func (c *Cache) Start() error {
 func (c *Cache) Stop() error {
 	return c.engine.Stop()
 }
+func (c *Cache) NewNested(builder ...Builder) *NestedCache {
+	return NewNestedCache(c).WithBuilder(builder...)
+}
+func (c *Cache) BuildCache(nested *NestedCache) error {
+	nested.Cache = c.Clone()
+	return nil
+}
+
 func New() *Cache {
 	return &Cache{
 		NamespaceTree: [][]byte{[]byte{}},

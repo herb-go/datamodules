@@ -1,4 +1,4 @@
-package versionedcache
+package ncache
 
 import (
 	"github.com/herb-go/herbdata/kvdb"
@@ -6,10 +6,9 @@ import (
 )
 
 type Config struct {
-	Store        *kvdb.Config
+	Cache        *kvdb.Config
 	VersionStore *kvdb.Config
 	VersionTTL   int64
-	Revocable    bool
 }
 
 func (c *Config) ApplyTo(cache *Cache) error {
@@ -17,12 +16,15 @@ func (c *Config) ApplyTo(cache *Cache) error {
 	var versiondb *kvdb.Database
 	e := NewEngine()
 	db := kvdb.New()
-	err = c.Store.ApplyTo(db)
+	err = c.Cache.ApplyTo(db)
 	if err != nil {
 		return err
 	}
+	if !db.Features().SupportAll(kvdb.FeatureTTLStore) {
+		return kvdb.ErrFeatureNotSupported
+	}
 	e.Cache = db
-	if c.VersionStore != nil {
+	if c.VersionStore != nil && c.VersionStore.Driver != "" {
 		versiondb = kvdb.New()
 		err = c.VersionStore.ApplyTo(versiondb)
 		if err != nil {
@@ -42,14 +44,14 @@ func (c *Config) ApplyTo(cache *Cache) error {
 			e.VersionStore = versiondb
 		}
 	}
-	if c.Revocable && e.VersionStore == nil {
-		return ErrNoVersionStore
-	}
 	e.VersionTTL = c.VersionTTL
 	cache.CopyFrom(
 		New().
-			WithEngine(e).
-			WithRevocable(c.Revocable),
+			WithEngine(e),
 	)
 	return nil
+}
+
+func NewConfig() *Config {
+	return &Config{}
 }
