@@ -18,8 +18,8 @@ func (d testDriver) Features() kvdb.Feature {
 	return d.Feature
 }
 
-func newTestDriverConfig(feature kvdb.Feature) *Config {
-	config := NewConfig()
+func newTestDriverConfig(feature kvdb.Feature) *StorageConfig {
+	config := NewStorageConfig()
 	config.Cache = &kvdb.Config{
 		Driver: "vcachetestdriver",
 		Config: func(v interface{}) error {
@@ -31,9 +31,8 @@ func newTestDriverConfig(feature kvdb.Feature) *Config {
 	return config
 }
 
-func getCacheVersionStoreDirver(c *Cache) kvdb.Driver {
-	s := c.engine.VersionStore.(*kvdb.Database)
-	return s.Driver
+func getCacheVersionStoreDirver(s *Storage) kvdb.Driver {
+	return s.VersionStore.(*kvdb.Database).Driver
 }
 func init() {
 	kvdb.Register("vcachetestdriver", func(loader func(v interface{}) error) (kvdb.Driver, error) {
@@ -48,54 +47,54 @@ func init() {
 
 func TestConfig(t *testing.T) {
 	var err error
-	var config *Config
-	var c *Cache
+	var config *StorageConfig
+	var s *Storage
 	config = newTestDriverConfig(0)
-	c = New()
-	err = config.ApplyTo(c)
+	s = NewStorage()
+	err = config.ApplyTo(s)
 	if err != kvdb.ErrFeatureNotSupported {
 		t.Fatal()
 	}
 	config = newTestDriverConfig(kvdb.FeatureTTLStore)
-	c = New()
-	err = config.ApplyTo(c)
+	s = NewStorage()
+	err = config.ApplyTo(s)
 	if err != nil {
 		panic(err)
 	}
-	if c.engine.VersionStore != nil {
+	if s.VersionStore != nil {
 		t.Fatal()
 	}
 	config = newTestDriverConfig(kvdb.FeatureTTLStore | kvdb.FeatureStore)
-	c = New()
-	err = config.ApplyTo(c)
+	s = NewStorage()
+	err = config.ApplyTo(s)
 	if err != nil {
 		panic(err)
 	}
-	if c.engine.VersionStore == nil {
+	if s.VersionStore == nil {
 		t.Fatal()
 	}
-	if _, ok := getCacheVersionStoreDirver(c).(testDriver); !ok {
+	if _, ok := getCacheVersionStoreDirver(s).(testDriver); !ok {
 		t.Fatal()
 	}
 	config = newTestDriverConfig(kvdb.FeatureTTLStore | kvdb.FeatureStore | kvdb.FeatureUnstable)
-	c = New()
-	err = config.ApplyTo(c)
+	s = NewStorage()
+	err = config.ApplyTo(s)
 	if err != nil {
 		panic(err)
 	}
-	if c.engine.VersionStore != nil {
+	if s.VersionStore != nil {
 		t.Fatal()
 	}
 	config = newTestDriverConfig(kvdb.FeatureTTLStore | kvdb.FeatureEmbedded | kvdb.FeatureNonpersistent)
-	c = New()
-	err = config.ApplyTo(c)
+	s = NewStorage()
+	err = config.ApplyTo(s)
 	if err != nil {
 		panic(err)
 	}
-	if c.engine.VersionStore == nil {
+	if s.VersionStore == nil {
 		t.Fatal()
 	}
-	if _, ok := getCacheVersionStoreDirver(c).(*commonkvdb.InMemory); !ok {
+	if _, ok := getCacheVersionStoreDirver(s).(*commonkvdb.InMemory); !ok {
 		t.Fatal()
 	}
 }

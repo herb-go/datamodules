@@ -16,8 +16,8 @@ import (
 var _ herbdata.NestableCache = New()
 
 func newTestCache() *Cache {
-	c := New()
-	config := &Config{
+	s := NewStorage()
+	config := &StorageConfig{
 		Cache: &kvdb.Config{
 			Driver: "freecache",
 			Config: func(v interface{}) error {
@@ -30,15 +30,15 @@ func newTestCache() *Cache {
 		},
 	}
 
-	err := config.ApplyTo(c)
+	err := config.ApplyTo(s)
 	if err != nil {
 		panic(err)
 	}
-	err = c.Start()
+	err = s.Start()
 	if err != nil {
 		panic(err)
 	}
-	return c.WithRevocable(true)
+	return New().WithRevocable(true).WithStorage(s)
 }
 
 var TestKey = []byte("testkey")
@@ -51,8 +51,8 @@ func TestCache(t *testing.T) {
 	var data []byte
 	var namespace = []byte("namespace")
 	c := newTestCache().WithSuffix(namespace)
-	c.engine.VersionTTL = 0
-	defer c.Stop()
+	c.storage.VersionTTL = 0
+	defer c.Storage().Stop()
 	if !c.Revocable() {
 		t.Fatal(c.Revocable())
 	}
@@ -137,7 +137,7 @@ func TestCachedVersionCache(t *testing.T) {
 	var data []byte
 	var namespace = []byte("namespace")
 	c := newTestCache().WithSuffix(namespace)
-	defer c.Stop()
+	defer c.Storage().Stop()
 	if !c.Revocable() {
 		t.Fatal(c.Revocable())
 	}
@@ -220,7 +220,7 @@ func TestIrrevocableCache(t *testing.T) {
 	var err error
 	var data []byte
 	c := newTestCache().WithRevocable(false).WithSuffix([]byte("namespace"))
-	defer c.Stop()
+	defer c.Storage().Stop()
 	if c.Revocable() {
 		t.Fatal(c.Revocable())
 	}
@@ -280,9 +280,9 @@ func TestIrrevocableCache(t *testing.T) {
 func TestCacheOperations(t *testing.T) {
 	var cc *Cache
 	c := newTestCache()
-	e := c.engine
-	defer e.Stop()
-	if c.Engine() != e {
+	s := c.storage
+	defer s.Stop()
+	if c.Storage() != s {
 		t.Fatal(c)
 	}
 	if c.Equal(nil) {
@@ -300,8 +300,8 @@ func TestCacheOperations(t *testing.T) {
 	if cc.revocable != false || c.revocable != true {
 		t.Fatal(cc, c)
 	}
-	cc = c.WithEngine(nil)
-	if cc.engine != nil || c.engine == nil {
+	cc = c.WithStorage(nil)
+	if cc.storage != nil || c.storage == nil {
 		t.Fatal(cc, c)
 	}
 	cc = c.WithSuffix([]byte("suffix"))
@@ -312,10 +312,10 @@ func TestCacheOperations(t *testing.T) {
 	if cc.Equal(c) {
 		t.Fatal(cc, c)
 	}
-	cc = c.WithEngine(nil).WithRevocable(false)
+	cc = c.WithStorage(nil).WithRevocable(false)
 	c.CopyFrom(cc)
 	if c.revocable != false ||
-		c.engine != nil {
+		c.storage != nil {
 		t.Fatal(c)
 	}
 }
@@ -323,8 +323,8 @@ func TestCacheOperations(t *testing.T) {
 func TestNoVersionStoreCache(t *testing.T) {
 	var err error
 	c := newTestCache()
-	c.engine.VersionStore = nil
-	defer c.Stop()
+	c.storage.VersionStore = nil
+	defer c.Storage().Stop()
 	err = c.Revoke()
 	if err != ErrNoVersionStore {
 		t.Fatal()
@@ -334,7 +334,7 @@ func TestNamespace(t *testing.T) {
 	var err error
 	var data []byte
 	c := newTestCache()
-	defer c.Stop()
+	defer c.Storage().Stop()
 	var testkey = []byte("testkey")
 	ctest1 := c.WithSuffix([]byte("test1"))
 	ctest2 := ctest1.WithSuffix([]byte("test2"))

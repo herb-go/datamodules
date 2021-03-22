@@ -5,16 +5,15 @@ import (
 	"github.com/herb-go/herbdata/kvdb/commonkvdb"
 )
 
-type Config struct {
+type StorageConfig struct {
 	Cache        *kvdb.Config
 	VersionStore *kvdb.Config
 	VersionTTL   int64
 }
 
-func (c *Config) ApplyTo(cache *Cache) error {
+func (c *StorageConfig) ApplyTo(storage *Storage) error {
 	var err error
 	var versiondb *kvdb.Database
-	e := NewEngine()
 	db := kvdb.New()
 	err = c.Cache.ApplyTo(db)
 	if err != nil {
@@ -23,35 +22,31 @@ func (c *Config) ApplyTo(cache *Cache) error {
 	if !db.Features().SupportAll(kvdb.FeatureTTLStore) {
 		return kvdb.ErrFeatureNotSupported
 	}
-	e.Cache = db
+	storage.Cache = db
 	if c.VersionStore != nil && c.VersionStore.Driver != "" {
 		versiondb = kvdb.New()
 		err = c.VersionStore.ApplyTo(versiondb)
 		if err != nil {
 			return err
 		}
-		e.VersionStore = versiondb
+		storage.VersionStore = versiondb
 	} else {
 		features := db.Features()
 		if features.SupportAll(kvdb.FeatureStore) && !features.SupportAny(kvdb.FeatureUnstable) {
-			e.VersionStore = db
+			storage.VersionStore = db
 		} else if features.SupportAll(kvdb.FeatureEmbedded | kvdb.FeatureNonpersistent) {
 			versiondb = kvdb.New()
 			err = commonkvdb.NewInMemory().ApplyTo(versiondb)
 			if err != nil {
 				return err
 			}
-			e.VersionStore = versiondb
+			storage.VersionStore = versiondb
 		}
 	}
-	e.VersionTTL = c.VersionTTL
-	cache.CopyFrom(
-		New().
-			WithEngine(e),
-	)
+	storage.VersionTTL = c.VersionTTL
 	return nil
 }
 
-func NewConfig() *Config {
-	return &Config{}
+func NewStorageConfig() *StorageConfig {
+	return &StorageConfig{}
 }

@@ -8,15 +8,20 @@ import (
 	"github.com/herb-go/herbdata/datautil"
 )
 
-type Engine struct {
+type Storage struct {
 	VersionGenerator func() (string, error)
 	VersionTTL       int64
 	VersionStore     herbdata.SetterGetterServer
 	Cache            herbdata.CacheServer
 }
 
-func (e *Engine) LoadRawVersion(key []byte) ([]byte, error) {
-	v, err := e.VersionStore.Get(key)
+func (s *Storage) Execute(c *Cache) error {
+	c.storage = s
+	return nil
+}
+
+func (s *Storage) LoadRawVersion(key []byte) ([]byte, error) {
+	v, err := s.VersionStore.Get(key)
 	if err == nil {
 		return v, nil
 	}
@@ -25,22 +30,22 @@ func (e *Engine) LoadRawVersion(key []byte) ([]byte, error) {
 	}
 	return nil, err
 }
-func (e *Engine) Start() error {
-	if e.VersionStore != nil {
-		err := e.VersionStore.Start()
+func (s *Storage) Start() error {
+	if s.VersionStore != nil {
+		err := s.VersionStore.Start()
 		if err != nil {
 			return err
 		}
 	}
-	return e.Cache.Start()
+	return s.Cache.Start()
 }
-func (e *Engine) Stop() error {
+func (s *Storage) Stop() error {
 	var vererr error
 	var err error
-	if e.VersionStore != nil {
-		vererr = e.VersionStore.Stop()
+	if s.VersionStore != nil {
+		vererr = s.VersionStore.Stop()
 	}
-	err = e.Cache.Stop()
+	err = s.Cache.Stop()
 	if vererr != nil {
 		return vererr
 	}
@@ -58,8 +63,8 @@ var DefaultVersionGenerator = func() (string, error) {
 	return string(v), nil
 }
 
-func NewEngine() *Engine {
-	return &Engine{
+func NewStorage() *Storage {
+	return &Storage{
 		VersionGenerator: DefaultVersionGenerator,
 	}
 }

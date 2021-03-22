@@ -36,26 +36,27 @@ var CachePathPrefixVersion = CachePathPrefix([]byte{1})
 
 type Cache struct {
 	revocable     bool
-	NamespaceTree [][]byte
-	engine        *Engine
+	namespaceTree [][]byte
+	storage       *Storage
+	todos         []Directive
 }
 
 func (c *Cache) Revocable() bool {
 	return c.revocable
 }
 func (c *Cache) getCachedVersion(key []byte) ([]byte, error) {
-	version, err := c.engine.Cache.Get(key)
+	version, err := c.storage.Cache.Get(key)
 	if err == nil {
 		return version, nil
 	}
 	if err != herbdata.ErrNotFound {
 		return nil, err
 	}
-	version, err = c.engine.LoadRawVersion(key)
+	version, err = c.storage.LoadRawVersion(key)
 	if err != nil {
 		return nil, err
 	}
-	err = c.engine.Cache.SetWithTTL(key, version, c.engine.VersionTTL)
+	err = c.storage.Cache.SetWithTTL(key, version, c.storage.VersionTTL)
 	if err != nil {
 		return nil, err
 	}
@@ -64,14 +65,14 @@ func (c *Cache) getCachedVersion(key []byte) ([]byte, error) {
 func (c *Cache) getVersion() ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
 	var err error
-	cacheable := c.engine.VersionTTL > 0 && c.engine.VersionStore != nil
-	for k := range c.NamespaceTree {
+	cacheable := c.storage.VersionTTL > 0 && c.storage.VersionStore != nil
+	for k := range c.namespaceTree {
 		var version []byte
-		key := CachePathPrefixVersion.MustJoin(c.NamespaceTree[0 : k+1]...)
+		key := CachePathPrefixVersion.MustJoin(c.namespaceTree[0 : k+1]...)
 		if cacheable {
 			version, err = c.getCachedVersion(key)
 		} else {
-			version, err = c.engine.LoadRawVersion(key)
+			version, err = c.storage.LoadRawVersion(key)
 		}
 		if err != nil {
 			return nil, err
@@ -84,28 +85,28 @@ func (c *Cache) getVersion() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 func (c *Cache) setVersion(version []byte) error {
-	cacheable := c.engine.VersionTTL > 0 && c.engine.VersionStore != nil
-	key := CachePathPrefixVersion.MustJoin(c.NamespaceTree...)
-	err := c.engine.VersionStore.Set(key, version)
+	cacheable := c.storage.VersionTTL > 0 && c.storage.VersionStore != nil
+	key := CachePathPrefixVersion.MustJoin(c.namespaceTree...)
+	err := c.storage.VersionStore.Set(key, version)
 	if err != nil {
 		return err
 	}
 	if cacheable {
-		return c.engine.Cache.Delete(key)
+		return c.storage.Cache.Delete(key)
 	}
 	return nil
 }
 func (c *Cache) mustGetNamespace() []byte {
-	return Join(c.NamespaceTree...)
+	return Join(c.namespaceTree...)
 }
 func (c *Cache) Revoke() error {
 	if !c.revocable {
 		return herbdata.ErrIrrevocable
 	}
-	if c.engine.VersionStore == nil {
+	if c.storage.VersionStore == nil {
 		return ErrNoVersionStore
 	}
-	v, err := c.engine.VersionGenerator()
+	v, err := c.storage.VersionGenerator()
 	if err != nil {
 		return err
 	}
@@ -123,7 +124,7 @@ func (c *Cache) Get(key []byte) ([]byte, error) {
 			return nil, err
 		}
 	}
-	data, err = c.engine.Cache.Get(CachePathPrefixValue.MustJoin(namespace, key))
+	data, err = c.storage.Cache.Get(CachePathPrefixValue.MustJoin(namespace, key))
 	if err != nil {
 		return nil, err
 	}
@@ -155,24 +156,24 @@ func (c *Cache) SetWithTTL(key []byte, data []byte, ttl int64) error {
 	if err != nil {
 		return err
 	}
-	return c.engine.Cache.SetWithTTL(CachePathPrefixValue.MustJoin(namespace, key), buf.Bytes(), ttl)
+	return c.storage.Cache.SetWithTTL(CachePathPrefixValue.MustJoin(namespace, key), buf.Bytes(), ttl)
 }
 
 func (c *Cache) Delete(key []byte) error {
 	namespace := c.mustGetNamespace()
-	return c.engine.Cache.Delete(CachePathPrefixValue.MustJoin(namespace, key))
+	return c.storage.Cache.Delete(CachePathPrefixValue.MustJoin(namespace, key))
 }
 
 func (c *Cache) Clone() *Cache {
-	t := make([][]byte, len(c.NamespaceTree))
+	t := make([][]byte, len(c.namespaceTree))
 	for k := range t {
-		t[k] = make([]byte, len(c.NamespaceTree[k]))
-		copy(t[k], c.NamespaceTree[k])
+		t[k] = append([]byte{}, c.namespaceTree[k]...)
 	}
 	return &Cache{
 		revocable:     c.revocable,
-		engine:        c.engine,
-		NamespaceTree: t,
+		storage:       c.storage,
+		namespaceTree: t,
+		todos:         append([]Directive{}, c.todos...),
 	}
 }
 func (c *Cache) NamescapedCache(namescape []byte) herbdata.NestableCache {
@@ -200,13 +201,13 @@ func (c *Cache) buildNamespace(prefix []byte, suffixs ...[]byte) {
 	if err != nil {
 		panic(err)
 	}
-	index := len(c.NamespaceTree) - 1
-	c.NamespaceTree[index] = buf.Bytes()
+	index := len(c.namespaceTree) - 1
+	c.namespaceTree[index] = buf.Bytes()
 }
 func (c *Cache) WithSuffix(suffixs ...[]byte) *Cache {
-	index := len(c.NamespaceTree) - 1
+	index := len(c.namespaceTree) - 1
 	cc := c.Clone()
-	cc.buildNamespace(c.NamespaceTree[index], suffixs...)
+	cc.buildNamespace(c.namespaceTree[index], suffixs...)
 	return cc
 }
 func (c *Cache) WithNamesapce(namespace ...[]byte) *Cache {
@@ -214,54 +215,61 @@ func (c *Cache) WithNamesapce(namespace ...[]byte) *Cache {
 	cc.buildNamespace(nil, namespace...)
 	return cc
 }
+func (c *Cache) WithTodos(todos ...Directive) *Cache {
+	cc := c.Clone()
+	c.todos = append(c.todos, todos...)
+	return cc
+}
+func (c *Cache) Todos() []Directive {
+	return c.todos
+}
+
+func (c *Cache) ExecuteTodos() error {
+	for len(c.todos) > 0 {
+		err := c.todos[0].Execute(c)
+		if err != nil {
+			return err
+		}
+		c.todos = c.todos[1:]
+	}
+	return nil
+}
+
 func (c *Cache) Child(name ...[]byte) *Cache {
 	cc := c.Clone()
-	cc.NamespaceTree = append(cc.NamespaceTree, name...)
+	cc.namespaceTree = append(cc.namespaceTree, name...)
 	return cc
 }
-func (c *Cache) WithEngine(engine *Engine) *Cache {
+func (c *Cache) WithStorage(storage *Storage) *Cache {
 	cc := c.Clone()
-	cc.engine = engine
+	cc.storage = storage
 	return cc
 }
-func (c *Cache) Engine() *Engine {
-	return c.engine
+func (c *Cache) Storage() *Storage {
+	return c.storage
 }
+
 func (c *Cache) CopyFrom(src *Cache) {
-	c.revocable = src.revocable
-	c.engine = src.engine
+	SetCache(c, src.Clone())
 }
 func (c *Cache) Equal(dst *Cache) bool {
 	if dst == nil || c == nil {
 		return dst == nil && c == nil
 	}
-	if len(c.NamespaceTree) != len(dst.NamespaceTree) {
+	if len(c.namespaceTree) != len(dst.namespaceTree) {
 		return false
 	}
-	for k := range c.NamespaceTree {
-		if bytes.Compare(c.NamespaceTree[k], dst.NamespaceTree[k]) != 0 {
+	for k := range c.namespaceTree {
+		if bytes.Compare(c.namespaceTree[k], dst.namespaceTree[k]) != 0 {
 			return false
 		}
 	}
 	return c.revocable == dst.revocable &&
-		c.engine == dst.engine
-}
-func (c *Cache) Start() error {
-	return c.engine.Start()
-}
-func (c *Cache) Stop() error {
-	return c.engine.Stop()
-}
-func (c *Cache) NewNested(builder ...Builder) *NestedCache {
-	return NewNestedCache(c).WithBuilder(builder...)
-}
-func (c *Cache) BuildCache(nested *NestedCache) error {
-	nested.Cache = c.Clone()
-	return nil
+		c.storage == dst.storage
 }
 
 func New() *Cache {
 	return &Cache{
-		NamespaceTree: [][]byte{[]byte{}},
+		namespaceTree: [][]byte{[]byte{}},
 	}
 }
