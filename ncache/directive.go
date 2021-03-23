@@ -49,8 +49,8 @@ func SetCacheRevocable(c *Cache, revocable bool) {
 func SetCacheStorage(c *Cache, storage *Storage) {
 	c.storage = storage
 }
-func SetCacheTodos(c *Cache, todos ...Directive) {
-	c.todos = todos
+func SetCachePromises(c *Cache, promises ...Directive) {
+	c.promises = promises
 }
 func SetCache(c *Cache, src *Cache) {
 	*c = *src

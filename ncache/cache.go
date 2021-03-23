@@ -38,7 +38,7 @@ type Cache struct {
 	revocable     bool
 	namespaceTree [][]byte
 	storage       *Storage
-	todos         []Directive
+	promises      []Directive
 }
 
 func (c *Cache) Revocable() bool {
@@ -173,7 +173,7 @@ func (c *Cache) Clone() *Cache {
 		revocable:     c.revocable,
 		storage:       c.storage,
 		namespaceTree: t,
-		todos:         append([]Directive{}, c.todos...),
+		promises:      append([]Directive{}, c.promises...),
 	}
 }
 func (c *Cache) NamescapedCache(namescape []byte) herbdata.NestableCache {
@@ -215,22 +215,22 @@ func (c *Cache) VaryNamesapce(namespace ...[]byte) *Cache {
 	cc.buildNamespace(nil, namespace...)
 	return cc
 }
-func (c *Cache) VaryTodos(todos ...Directive) *Cache {
+func (c *Cache) VaryMorePromises(promises ...Directive) *Cache {
 	cc := c.Clone()
-	c.todos = append(c.todos, todos...)
+	c.promises = append(c.promises, promises...)
 	return cc
 }
-func (c *Cache) Todos() []Directive {
-	return c.todos
+func (c *Cache) Promises() []Directive {
+	return c.promises
 }
 
-func (c *Cache) ExecuteTodos() error {
-	for len(c.todos) > 0 {
-		err := c.todos[0].Execute(c)
+func (c *Cache) ResolvePromises() error {
+	for len(c.promises) > 0 {
+		err := c.promises[0].Execute(c)
 		if err != nil {
 			return err
 		}
-		c.todos = c.todos[1:]
+		c.promises = c.promises[1:]
 	}
 	return nil
 }
