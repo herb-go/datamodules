@@ -13,7 +13,7 @@ func (f DirectiveFunc) Execute(c *Cache) error {
 type Revocable bool
 
 func (r Revocable) Execute(c *Cache) error {
-	SetCache(c, c.WithRevocable(bool(r)))
+	SetCache(c, c.VaryRevocable(bool(r)))
 	return nil
 }
 
@@ -26,14 +26,14 @@ func Child(path ...[]byte) Directive {
 
 func Namespace(ns ...[]byte) Directive {
 	return DirectiveFunc(func(c *Cache) error {
-		SetCache(c, c.WithNamesapce(ns...))
+		SetCache(c, c.VaryNamesapce(ns...))
 		return nil
 	})
 }
 
 func Suffix(suffixs ...[]byte) Directive {
 	return DirectiveFunc(func(c *Cache) error {
-		SetCache(c, c.WithSuffix(suffixs...))
+		SetCache(c, c.VarySuffix(suffixs...))
 		return nil
 	})
 }

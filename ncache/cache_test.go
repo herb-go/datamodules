@@ -38,7 +38,7 @@ func newTestCache() *Cache {
 	if err != nil {
 		panic(err)
 	}
-	return New().WithRevocable(true).WithStorage(s)
+	return New().VaryRevocable(true).VaryStorage(s)
 }
 
 var TestKey = []byte("testkey")
@@ -50,7 +50,7 @@ func TestCache(t *testing.T) {
 	var err error
 	var data []byte
 	var namespace = []byte("namespace")
-	c := newTestCache().WithSuffix(namespace)
+	c := newTestCache().VarySuffix(namespace)
 	c.storage.VersionTTL = 0
 	defer c.Storage().Stop()
 	if !c.Revocable() {
@@ -136,7 +136,7 @@ func TestCachedVersionCache(t *testing.T) {
 	var err error
 	var data []byte
 	var namespace = []byte("namespace")
-	c := newTestCache().WithSuffix(namespace)
+	c := newTestCache().VarySuffix(namespace)
 	defer c.Storage().Stop()
 	if !c.Revocable() {
 		t.Fatal(c.Revocable())
@@ -219,7 +219,7 @@ func TestCachedVersionCache(t *testing.T) {
 func TestIrrevocableCache(t *testing.T) {
 	var err error
 	var data []byte
-	c := newTestCache().WithRevocable(false).WithSuffix([]byte("namespace"))
+	c := newTestCache().VaryRevocable(false).VarySuffix([]byte("namespace"))
 	defer c.Storage().Stop()
 	if c.Revocable() {
 		t.Fatal(c.Revocable())
@@ -296,15 +296,15 @@ func TestCacheOperations(t *testing.T) {
 		t.Fatal(cc)
 	}
 
-	cc = c.WithRevocable(false)
+	cc = c.VaryRevocable(false)
 	if cc.revocable != false || c.revocable != true {
 		t.Fatal(cc, c)
 	}
-	cc = c.WithStorage(nil)
+	cc = c.VaryStorage(nil)
 	if cc.storage != nil || c.storage == nil {
 		t.Fatal(cc, c)
 	}
-	cc = c.WithSuffix([]byte("suffix"))
+	cc = c.VarySuffix([]byte("suffix"))
 	if cc.Equal(c) {
 		t.Fatal(cc, c)
 	}
@@ -312,7 +312,7 @@ func TestCacheOperations(t *testing.T) {
 	if cc.Equal(c) {
 		t.Fatal(cc, c)
 	}
-	cc = c.WithStorage(nil).WithRevocable(false)
+	cc = c.VaryStorage(nil).VaryRevocable(false)
 	c.CopyFrom(cc)
 	if c.revocable != false ||
 		c.storage != nil {
@@ -336,8 +336,8 @@ func TestNamespace(t *testing.T) {
 	c := newTestCache()
 	defer c.Storage().Stop()
 	var testkey = []byte("testkey")
-	ctest1 := c.WithSuffix([]byte("test1"))
-	ctest2 := ctest1.WithSuffix([]byte("test2"))
+	ctest1 := c.VarySuffix([]byte("test1"))
+	ctest2 := ctest1.VarySuffix([]byte("test2"))
 	ctest2_test3 := ctest2.Child([]byte("test3"))
 	ctest2_test3_test4 := ctest2_test3.Child([]byte("test4"))
 	err = ctest2_test3_test4.SetWithTTL(testkey, []byte("test4"), 3600)
@@ -376,11 +376,11 @@ func TestNamespace(t *testing.T) {
 	if !bytes.Equal(data, []byte("test2")) || err != nil {
 		t.Fatal(data, err)
 	}
-	data, err = c.WithSuffix([]byte("test1")).WithSuffix([]byte("test2")).Get(testkey)
+	data, err = c.VarySuffix([]byte("test1")).VarySuffix([]byte("test2")).Get(testkey)
 	if !bytes.Equal(data, []byte("test2")) || err != nil {
 		t.Fatal(data, err)
 	}
-	data, err = c.WithSuffix([]byte("test1test2")).Get(testkey)
+	data, err = c.VarySuffix([]byte("test1test2")).Get(testkey)
 	if err != herbdata.ErrNotFound {
 		t.Fatal(data, err)
 	}
@@ -425,11 +425,11 @@ func TestNamespace(t *testing.T) {
 	if err != herbdata.ErrNotFound {
 		t.Fatal(data, err)
 	}
-	ctestnamespace := c.WithNamesapce([]byte("ns1"), []byte("ns2"), []byte("ns3"))
-	ctestsuffix := c.WithNamesapce([]byte("ns1")).WithSuffix([]byte("ns2"), []byte("ns3"))
-	ctestsuffix2 := c.WithNamesapce([]byte("ns1")).WithSuffix([]byte("ns2")).WithSuffix([]byte("ns3"))
-	ctestsuffix3 := c.WithSuffix([]byte("ns1"), []byte("ns2"), []byte("ns3"))
-	ctestnamespacefail := c.WithNamesapce([]byte("ns1")).WithNamesapce([]byte("ns2"), []byte("ns3"))
+	ctestnamespace := c.VaryNamesapce([]byte("ns1"), []byte("ns2"), []byte("ns3"))
+	ctestsuffix := c.VaryNamesapce([]byte("ns1")).VarySuffix([]byte("ns2"), []byte("ns3"))
+	ctestsuffix2 := c.VaryNamesapce([]byte("ns1")).VarySuffix([]byte("ns2")).VarySuffix([]byte("ns3"))
+	ctestsuffix3 := c.VarySuffix([]byte("ns1"), []byte("ns2"), []byte("ns3"))
+	ctestnamespacefail := c.VaryNamesapce([]byte("ns1")).VaryNamesapce([]byte("ns2"), []byte("ns3"))
 	for _, v := range []*Cache{ctestnamespace, ctestsuffix, ctestsuffix2, ctestsuffix3, ctestnamespacefail} {
 		data, err = v.Get(testkey)
 		if err != herbdata.ErrNotFound {

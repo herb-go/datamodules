@@ -177,13 +177,13 @@ func (c *Cache) Clone() *Cache {
 	}
 }
 func (c *Cache) NamescapedCache(namescape []byte) herbdata.NestableCache {
-	return c.WithNamesapce(namescape)
+	return c.VaryNamesapce(namescape)
 }
 func (c *Cache) ChildCache(name []byte) herbdata.NestableCache {
 	return c.Child(name)
 }
 
-func (c *Cache) WithRevocable(revocable bool) *Cache {
+func (c *Cache) VaryRevocable(revocable bool) *Cache {
 	cc := c.Clone()
 	cc.revocable = revocable
 	return cc
@@ -204,18 +204,18 @@ func (c *Cache) buildNamespace(prefix []byte, suffixs ...[]byte) {
 	index := len(c.namespaceTree) - 1
 	c.namespaceTree[index] = buf.Bytes()
 }
-func (c *Cache) WithSuffix(suffixs ...[]byte) *Cache {
+func (c *Cache) VarySuffix(suffixs ...[]byte) *Cache {
 	index := len(c.namespaceTree) - 1
 	cc := c.Clone()
 	cc.buildNamespace(c.namespaceTree[index], suffixs...)
 	return cc
 }
-func (c *Cache) WithNamesapce(namespace ...[]byte) *Cache {
+func (c *Cache) VaryNamesapce(namespace ...[]byte) *Cache {
 	cc := c.Clone()
 	cc.buildNamespace(nil, namespace...)
 	return cc
 }
-func (c *Cache) WithTodos(todos ...Directive) *Cache {
+func (c *Cache) VaryTodos(todos ...Directive) *Cache {
 	cc := c.Clone()
 	c.todos = append(c.todos, todos...)
 	return cc
@@ -240,7 +240,7 @@ func (c *Cache) Child(name ...[]byte) *Cache {
 	cc.namespaceTree = append(cc.namespaceTree, name...)
 	return cc
 }
-func (c *Cache) WithStorage(storage *Storage) *Cache {
+func (c *Cache) VaryStorage(storage *Storage) *Cache {
 	cc := c.Clone()
 	cc.storage = storage
 	return cc
