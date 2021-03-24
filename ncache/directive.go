@@ -17,29 +17,32 @@ func (r Revocable) Execute(c *Cache) error {
 	return nil
 }
 
-func Child(path ...[]byte) Directive {
+func Child(path []byte) Directive {
 	return DirectiveFunc(func(c *Cache) error {
-		SetCache(c, c.Child(path...))
+		SetCache(c, c.Child(path))
 		return nil
 	})
 }
-
-func Namespace(ns ...[]byte) Directive {
+func Namespace(namespace []byte) Directive {
 	return DirectiveFunc(func(c *Cache) error {
-		SetCache(c, c.VaryNamesapce(ns...))
+		SetCache(c, c.VaryNamesapce(namespace))
 		return nil
 	})
 }
-
-func Suffix(suffixs ...[]byte) Directive {
+func Prefix(prefix []byte) Directive {
 	return DirectiveFunc(func(c *Cache) error {
-		SetCache(c, c.VarySuffix(suffixs...))
+		SetCache(c, c.VaryPrefix(prefix))
 		return nil
 	})
 }
-
-func SetCacheNamespaceTree(c *Cache, nst [][]byte) {
-	c.namespaceTree = nst
+func SetCachePrefix(c *Cache, prefix []byte) {
+	c.prefix = prefix
+}
+func SetCacheNamespace(c *Cache, namespace []byte) {
+	c.namespace = namespace
+}
+func SetCachePath(c *Cache, path *Path) {
+	c.path = path
 }
 
 func SetCacheRevocable(c *Cache, revocable bool) {

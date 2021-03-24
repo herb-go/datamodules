@@ -2,47 +2,100 @@ package ncache
 
 import (
 	"bytes"
+	"io"
+
+	"github.com/herb-go/herbdata/datautil"
 
 	"github.com/herb-go/herbdata"
-	"github.com/herb-go/herbdata/datautil"
 )
 
-func Join(pathlist ...[]byte) []byte {
-	buf := bytes.NewBuffer(nil)
-	err := datautil.PackTo(buf, nil, pathlist...)
-	if err != nil {
-		panic(err)
-	}
-	return buf.Bytes()
-}
-
-type CachePathPrefix []byte
-
-func (p CachePathPrefix) MustJoin(pathlist ...[]byte) []byte {
-	buf := bytes.NewBuffer(nil)
-	_, err := buf.Write(p)
-	if err != nil {
-		panic(err)
-	}
-	err = datautil.PackTo(buf, nil, pathlist...)
-	if err != nil {
-		panic(err)
-	}
-	return buf.Bytes()
-}
-
-var CachePathPrefixValue = CachePathPrefix([]byte{0})
-var CachePathPrefixVersion = CachePathPrefix([]byte{1})
-
 type Cache struct {
-	revocable     bool
-	namespaceTree [][]byte
-	storage       *Storage
-	promises      []Directive
+	revocable bool
+	namespace []byte
+	prefix    []byte
+	path      *Path
+	storage   *Storage
+	promises  []Directive
 }
 
 func (c *Cache) Revocable() bool {
 	return c.revocable
+}
+func (c *Cache) writeNamespace(w io.Writer) error {
+	var err error
+	_, err = writeTokenAndData(w, tokenBeforeNamespace, c.namespace)
+	return err
+}
+func (c *Cache) writePath(w io.Writer) error {
+	var err error
+	_, err = c.path.WriteTo(w)
+	return err
+}
+func (c *Cache) writeKey(w io.Writer, key []byte) error {
+	var err error
+	_, err = writeTokenAndData(w, tokenBeforePrefix, c.prefix)
+	if err != nil {
+		return err
+	}
+	_, err = writeTokenAndData(w, tokenBeforeValue, key)
+	return err
+}
+func (c *Cache) rawKey(key []byte) []byte {
+	var err error
+	buf := bytes.NewBuffer(nil)
+	err = c.writeNamespace(buf)
+	if err != nil {
+		panic(err)
+	}
+	err = c.writePath(buf)
+	if err != nil {
+		panic(err)
+	}
+	err = c.writeKey(buf, key)
+	if err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
+}
+
+func (c *Cache) loadVersion(key []byte, cacheable bool) ([]byte, error) {
+	if cacheable {
+		return c.getCachedVersion(key)
+	}
+	return c.storage.LoadRawVersion(key)
+}
+func (c *Cache) getRawkeyAndVersion(key []byte) ([]byte, []byte, error) {
+	var err error
+	versionbuf := bytes.NewBuffer(nil)
+	keybuf := bytes.NewBuffer(nil)
+	err = c.writeNamespace(keybuf)
+	if err != nil {
+		panic(err)
+	}
+	cacheable := c.storage.VersionTTL > 0 && c.storage.VersionStore != nil
+	np := c.path.toNextPath(nil)
+	for np != nil {
+		_, err = np.writeSelf(keybuf)
+		if err != nil {
+			return nil, nil, err
+		}
+		currentkey := keybuf.Bytes()
+		v, err := c.loadVersion(currentkey, cacheable)
+		if err != nil {
+			return nil, nil, err
+		}
+		err = datautil.PackTo(versionbuf, nil, v)
+		if err != nil {
+			return nil, nil, err
+		}
+		keybuf = bytes.NewBuffer(currentkey)
+		np = np.next
+	}
+	err = c.writeKey(keybuf, key)
+	if err != nil {
+		return nil, nil, err
+	}
+	return keybuf.Bytes(), versionbuf.Bytes(), nil
 }
 func (c *Cache) getCachedVersion(key []byte) ([]byte, error) {
 	version, err := c.storage.Cache.Get(key)
@@ -62,32 +115,21 @@ func (c *Cache) getCachedVersion(key []byte) ([]byte, error) {
 	}
 	return version, nil
 }
-func (c *Cache) getVersion() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
+
+func (c *Cache) setVersion(version []byte) error {
 	var err error
 	cacheable := c.storage.VersionTTL > 0 && c.storage.VersionStore != nil
-	for k := range c.namespaceTree {
-		var version []byte
-		key := CachePathPrefixVersion.MustJoin(c.namespaceTree[0 : k+1]...)
-		if cacheable {
-			version, err = c.getCachedVersion(key)
-		} else {
-			version, err = c.storage.LoadRawVersion(key)
-		}
-		if err != nil {
-			return nil, err
-		}
-		err = datautil.PackTo(buf, nil, version)
-		if err != nil {
-			return nil, err
-		}
+	keybuf := bytes.NewBuffer(nil)
+	err = c.writeNamespace(keybuf)
+	if err != nil {
+		return err
 	}
-	return buf.Bytes(), nil
-}
-func (c *Cache) setVersion(version []byte) error {
-	cacheable := c.storage.VersionTTL > 0 && c.storage.VersionStore != nil
-	key := CachePathPrefixVersion.MustJoin(c.namespaceTree...)
-	err := c.storage.VersionStore.Set(key, version)
+	_, err = c.path.toNextPath(nil).writeAll(keybuf)
+	if err != nil {
+		return err
+	}
+	key := keybuf.Bytes()
+	err = c.storage.VersionStore.Set(key, version)
 	if err != nil {
 		return err
 	}
@@ -96,9 +138,7 @@ func (c *Cache) setVersion(version []byte) error {
 	}
 	return nil
 }
-func (c *Cache) mustGetNamespace() []byte {
-	return Join(c.namespaceTree...)
-}
+
 func (c *Cache) Revoke() error {
 	if !c.revocable {
 		return herbdata.ErrIrrevocable
@@ -117,14 +157,16 @@ func (c *Cache) Get(key []byte) ([]byte, error) {
 	var version []byte
 	var err error
 	var e *enity
-	namespace := c.mustGetNamespace()
+	var rawkey []byte
 	if c.revocable {
-		version, err = c.getVersion()
+		rawkey, version, err = c.getRawkeyAndVersion(key)
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		rawkey = c.rawKey(key)
 	}
-	data, err = c.storage.Cache.Get(CachePathPrefixValue.MustJoin(namespace, key))
+	data, err = c.storage.Cache.Get(rawkey)
 	if err != nil {
 		return nil, err
 	}
@@ -143,12 +185,14 @@ func (c *Cache) SetWithTTL(key []byte, data []byte, ttl int64) error {
 	var version []byte
 	var err error
 	var e *enity
-	namespace := c.mustGetNamespace()
+	var rawkey []byte
 	if c.revocable {
-		version, err = c.getVersion()
+		rawkey, version, err = c.getRawkeyAndVersion(key)
 		if err != nil {
 			return err
 		}
+	} else {
+		rawkey = c.rawKey(key)
 	}
 	e = createEnity(c.revocable, version, data)
 	buf := bytes.NewBuffer(nil)
@@ -156,30 +200,25 @@ func (c *Cache) SetWithTTL(key []byte, data []byte, ttl int64) error {
 	if err != nil {
 		return err
 	}
-	return c.storage.Cache.SetWithTTL(CachePathPrefixValue.MustJoin(namespace, key), buf.Bytes(), ttl)
+	return c.storage.Cache.SetWithTTL(rawkey, buf.Bytes(), ttl)
 }
 
 func (c *Cache) Delete(key []byte) error {
-	namespace := c.mustGetNamespace()
-	return c.storage.Cache.Delete(CachePathPrefixValue.MustJoin(namespace, key))
+	return c.storage.Cache.Delete(c.rawKey(key))
 }
 
 func (c *Cache) Clone() *Cache {
-	t := make([][]byte, len(c.namespaceTree))
-	for k := range t {
-		t[k] = append([]byte{}, c.namespaceTree[k]...)
-	}
 	return &Cache{
-		revocable:     c.revocable,
-		storage:       c.storage,
-		namespaceTree: t,
-		promises:      append([]Directive{}, c.promises...),
+		revocable: c.revocable,
+		storage:   c.storage,
+		path:      c.path,
+		prefix:    c.prefix,
+		namespace: c.namespace,
+		promises:  append([]Directive{}, c.promises...),
 	}
 }
-func (c *Cache) NamescapedCache(namescape []byte) herbdata.NestableCache {
-	return c.VaryNamesapce(namescape)
-}
-func (c *Cache) ChildCache(name []byte) herbdata.NestableCache {
+
+func (c *Cache) SubCache(name []byte) herbdata.NestableCache {
 	return c.Child(name)
 }
 
@@ -188,31 +227,15 @@ func (c *Cache) VaryRevocable(revocable bool) *Cache {
 	cc.revocable = revocable
 	return cc
 }
-func (c *Cache) buildNamespace(prefix []byte, suffixs ...[]byte) {
-	var err error
-	buf := bytes.NewBuffer(nil)
-	if len(prefix) > 0 {
-		_, err = buf.Write(prefix)
-		if err != nil {
-			panic(err)
-		}
-	}
-	err = datautil.PackTo(buf, nil, suffixs...)
-	if err != nil {
-		panic(err)
-	}
-	index := len(c.namespaceTree) - 1
-	c.namespaceTree[index] = buf.Bytes()
-}
-func (c *Cache) VarySuffix(suffixs ...[]byte) *Cache {
-	index := len(c.namespaceTree) - 1
+
+func (c *Cache) VaryPrefix(prefix []byte) *Cache {
 	cc := c.Clone()
-	cc.buildNamespace(c.namespaceTree[index], suffixs...)
+	SetCachePrefix(cc, prefix)
 	return cc
 }
-func (c *Cache) VaryNamesapce(namespace ...[]byte) *Cache {
+func (c *Cache) VaryNamesapce(namespace []byte) *Cache {
 	cc := c.Clone()
-	cc.buildNamespace(nil, namespace...)
+	SetCacheNamespace(cc, namespace)
 	return cc
 }
 func (c *Cache) VaryMorePromises(promises ...Directive) *Cache {
@@ -225,7 +248,9 @@ func (c *Cache) Promises() []Directive {
 }
 
 func (c *Cache) ResolvePromises() error {
-	for len(c.promises) > 0 {
+	p := c.promises
+	c.promises = nil
+	for len(p) > 0 {
 		err := c.promises[0].Execute(c)
 		if err != nil {
 			return err
@@ -235,9 +260,10 @@ func (c *Cache) ResolvePromises() error {
 	return nil
 }
 
-func (c *Cache) Child(name ...[]byte) *Cache {
+func (c *Cache) Child(name []byte) *Cache {
 	cc := c.Clone()
-	cc.namespaceTree = append(cc.namespaceTree, name...)
+	SetCachePath(cc, cc.path.Append(c.prefix, name))
+	SetCachePrefix(cc, nil)
 	return cc
 }
 func (c *Cache) VaryStorage(storage *Storage) *Cache {
@@ -254,22 +280,21 @@ func (c *Cache) CopyFrom(src *Cache) {
 }
 func (c *Cache) Equal(dst *Cache) bool {
 	if dst == nil || c == nil {
-		return dst == nil && c == nil
+		return dst == c
 	}
-	if len(c.namespaceTree) != len(dst.namespaceTree) {
+	if !c.path.Equal(dst.path) {
 		return false
 	}
-	for k := range c.namespaceTree {
-		if bytes.Compare(c.namespaceTree[k], dst.namespaceTree[k]) != 0 {
-			return false
-		}
+	if !bytes.Equal(c.prefix, dst.prefix) {
+		return false
+	}
+	if !bytes.Equal(c.namespace, dst.namespace) {
+		return false
 	}
 	return c.revocable == dst.revocable &&
 		c.storage == dst.storage
 }
 
 func New() *Cache {
-	return &Cache{
-		namespaceTree: [][]byte{[]byte{}},
-	}
+	return &Cache{}
 }

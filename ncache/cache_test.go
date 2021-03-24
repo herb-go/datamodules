@@ -50,7 +50,7 @@ func TestCache(t *testing.T) {
 	var err error
 	var data []byte
 	var namespace = []byte("namespace")
-	c := newTestCache().VarySuffix(namespace)
+	c := newTestCache().VaryPrefix(namespace)
 	c.storage.VersionTTL = 0
 	defer c.Storage().Stop()
 	if !c.Revocable() {
@@ -136,7 +136,7 @@ func TestCachedVersionCache(t *testing.T) {
 	var err error
 	var data []byte
 	var namespace = []byte("namespace")
-	c := newTestCache().VarySuffix(namespace)
+	c := newTestCache().VaryPrefix(namespace)
 	defer c.Storage().Stop()
 	if !c.Revocable() {
 		t.Fatal(c.Revocable())
@@ -219,7 +219,7 @@ func TestCachedVersionCache(t *testing.T) {
 func TestIrrevocableCache(t *testing.T) {
 	var err error
 	var data []byte
-	c := newTestCache().VaryRevocable(false).VarySuffix([]byte("namespace"))
+	c := newTestCache().VaryRevocable(false).VaryPrefix([]byte("namespace"))
 	defer c.Storage().Stop()
 	if c.Revocable() {
 		t.Fatal(c.Revocable())
@@ -304,7 +304,7 @@ func TestCacheOperations(t *testing.T) {
 	if cc.storage != nil || c.storage == nil {
 		t.Fatal(cc, c)
 	}
-	cc = c.VarySuffix([]byte("suffix"))
+	cc = c.VaryPrefix([]byte("suffix"))
 	if cc.Equal(c) {
 		t.Fatal(cc, c)
 	}
@@ -330,126 +330,45 @@ func TestNoVersionStoreCache(t *testing.T) {
 		t.Fatal()
 	}
 }
+
+func shouldEqual(t *testing.T, key []byte, target []byte, e error, caches ...*Cache) {
+	for _, v := range caches {
+		data, err := v.Get(key)
+		if !bytes.Equal(data, target) || e != err {
+			t.Fatal(data, err)
+		}
+	}
+}
+func shouldNotEqual(t *testing.T, key []byte, target []byte, e error, caches ...*Cache) {
+	for _, v := range caches {
+		data, err := v.Get(key)
+		if bytes.Equal(data, target) || e == err {
+			t.Fatal(data, err)
+		}
+	}
+}
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
 func TestNamespace(t *testing.T) {
-	var err error
-	var data []byte
 	c := newTestCache()
 	defer c.Storage().Stop()
 	var testkey = []byte("testkey")
-	ctest1 := c.VarySuffix([]byte("test1"))
-	ctest2 := ctest1.VarySuffix([]byte("test2"))
-	ctest2_test3 := ctest2.Child([]byte("test3"))
-	ctest2_test3_test4 := ctest2_test3.Child([]byte("test4"))
-	err = ctest2_test3_test4.SetWithTTL(testkey, []byte("test4"), 3600)
-	if err != nil {
-		panic(err)
-	}
-	err = ctest2_test3.SetWithTTL(testkey, []byte("test3"), 3600)
-	if err != nil {
-		panic(err)
-	}
-	err = ctest2.SetWithTTL(testkey, []byte("test2"), 3600)
-	if err != nil {
-		panic(err)
-	}
-	err = ctest1.SetWithTTL(testkey, []byte("test1"), 3600)
-	if err != nil {
-		panic(err)
-	}
-	data, err = ctest2_test3_test4.Get(testkey)
-	if !bytes.Equal(data, []byte("test4")) || err != nil {
-		t.Fatal(data, err)
-	}
-	data, err = ctest2.Child([]byte("test3"), []byte("test4")).Get(testkey)
-	if !bytes.Equal(data, []byte("test4")) || err != nil {
-		t.Fatal(data, err)
-	}
-	data, err = ctest2.Child([]byte("test3test4")).Get(testkey)
-	if err != herbdata.ErrNotFound {
-		t.Fatal(data, err)
-	}
-	data, err = ctest2_test3.Get(testkey)
-	if !bytes.Equal(data, []byte("test3")) || err != nil {
-		t.Fatal(data, err)
-	}
-	data, err = ctest2.Get(testkey)
-	if !bytes.Equal(data, []byte("test2")) || err != nil {
-		t.Fatal(data, err)
-	}
-	data, err = c.VarySuffix([]byte("test1")).VarySuffix([]byte("test2")).Get(testkey)
-	if !bytes.Equal(data, []byte("test2")) || err != nil {
-		t.Fatal(data, err)
-	}
-	data, err = c.VarySuffix([]byte("test1test2")).Get(testkey)
-	if err != herbdata.ErrNotFound {
-		t.Fatal(data, err)
-	}
+	var testdata = []byte("testdata")
+	cns1 := c.VaryNamesapce([]byte("ns1"))
+	cns2 := c.VaryNamesapce([]byte("ns2"))
+	cns1sub1 := cns1.Child([]byte("sub1"))
+	cns2sub1 := cns1.Child([]byte("sub1"))
+	must(cns1.SetWithTTL(testkey, testdata, 3600))
 
-	data, err = ctest1.Get(testkey)
-	if !bytes.Equal(data, []byte("test1")) || err != nil {
-		t.Fatal(data, err)
-	}
-	err = ctest1.Revoke()
-	if err != nil {
-		panic(err)
-	}
-	data, err = ctest1.Get(testkey)
-	if err != herbdata.ErrNotFound {
-		t.Fatal(data, err)
-	}
-	data, err = ctest2.Get(testkey)
-	if !bytes.Equal(data, []byte("test2")) || err != nil {
-		t.Fatal(data, err)
-	}
-	data, err = ctest2_test3_test4.Get(testkey)
-	if !bytes.Equal(data, []byte("test4")) || err != nil {
-		t.Fatal(data, err)
-	}
-	data, err = ctest2.Child([]byte("test3"), []byte("test4")).Get(testkey)
-	if !bytes.Equal(data, []byte("test4")) || err != nil {
-		t.Fatal(data, err)
-	}
-	err = ctest2.Revoke()
-	if err != nil {
-		panic(err)
-	}
-	data, err = ctest2.Get(testkey)
-	if err != herbdata.ErrNotFound {
-		t.Fatal(data, err)
-	}
-	data, err = ctest2_test3_test4.Get(testkey)
-	if err != herbdata.ErrNotFound {
-		t.Fatal(data, err)
-	}
-	data, err = ctest2.Child([]byte("test3"), []byte("test4")).Get(testkey)
-	if err != herbdata.ErrNotFound {
-		t.Fatal(data, err)
-	}
-	ctestnamespace := c.VaryNamesapce([]byte("ns1"), []byte("ns2"), []byte("ns3"))
-	ctestsuffix := c.VaryNamesapce([]byte("ns1")).VarySuffix([]byte("ns2"), []byte("ns3"))
-	ctestsuffix2 := c.VaryNamesapce([]byte("ns1")).VarySuffix([]byte("ns2")).VarySuffix([]byte("ns3"))
-	ctestsuffix3 := c.VarySuffix([]byte("ns1"), []byte("ns2"), []byte("ns3"))
-	ctestnamespacefail := c.VaryNamesapce([]byte("ns1")).VaryNamesapce([]byte("ns2"), []byte("ns3"))
-	for _, v := range []*Cache{ctestnamespace, ctestsuffix, ctestsuffix2, ctestsuffix3, ctestnamespacefail} {
-		data, err = v.Get(testkey)
-		if err != herbdata.ErrNotFound {
-			t.Fatal(data, err)
-		}
-	}
-	err = ctestnamespace.SetWithTTL(testkey, []byte("testdata"), 3600)
-	if err != nil {
-		panic(err)
-	}
-	for _, v := range []*Cache{ctestnamespace, ctestsuffix, ctestsuffix2, ctestsuffix3} {
-		data, err = v.Get(testkey)
-		if !bytes.Equal(data, []byte("testdata")) || err != nil {
-			t.Fatal(data, err)
-		}
-	}
-	for _, v := range []*Cache{ctestnamespacefail} {
-		data, err = v.Get(testkey)
-		if err != herbdata.ErrNotFound {
-			t.Fatal(data, err)
-		}
-	}
+	shouldEqual(t, testkey, testdata, nil, cns1)
+	shouldNotEqual(t, testkey, testdata, nil, cns2, cns1sub1, cns2sub1)
+	must(cns1.Delete(testkey))
+	must(cns1sub1.SetWithTTL(testkey, testdata, 3600))
+	shouldEqual(t, testkey, testdata, nil, cns1sub1)
+	must(cns1.Revoke())
+	shouldNotEqual(t, testkey, testdata, nil, cns1sub1)
+
 }
