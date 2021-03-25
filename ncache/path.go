@@ -14,7 +14,7 @@ func (n *nextPath) writeSelf(w io.Writer) (int, error) {
 	if n.Path == nil {
 		return 0, nil
 	}
-	pl, err := writeTokenAndData(w, tokenBeforePrefix, n.prefix)
+	pl, err := writeTokenAndData(w, tokenBeforeGroup, n.group)
 	if err != nil {
 		return 0, err
 	}
@@ -40,9 +40,9 @@ func (n *nextPath) writeAll(w io.Writer) (int, error) {
 }
 
 type Path struct {
-	prev   *Path
-	name   []byte
-	prefix []byte
+	prev  *Path
+	name  []byte
+	group []byte
 }
 
 func (p *Path) toNextPath(next *nextPath) *nextPath {
@@ -62,11 +62,11 @@ func (p *Path) WriteTo(w io.Writer) (int64, error) {
 	}
 	return int64(l), nil
 }
-func (p *Path) Append(prefix []byte, name []byte) *Path {
+func (p *Path) Append(group []byte, name []byte) *Path {
 	return &Path{
-		prev:   p,
-		name:   name,
-		prefix: prefix,
+		prev:  p,
+		name:  name,
+		group: group,
 	}
 }
 func (p *Path) Equal(dst *Path) bool {

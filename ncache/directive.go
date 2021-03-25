@@ -10,10 +10,10 @@ func (f DirectiveFunc) Execute(c *Cache) error {
 	return f(c)
 }
 
-type Revocable bool
+type Flushable bool
 
-func (r Revocable) Execute(c *Cache) error {
-	SetCache(c, c.VaryRevocable(bool(r)))
+func (f Flushable) Execute(c *Cache) error {
+	SetCache(c, c.VaryFlushable(bool(f)))
 	return nil
 }
 
@@ -23,9 +23,9 @@ func Child(path []byte) Directive {
 		return nil
 	})
 }
-func Namespace(namespace []byte) Directive {
+func Migrate(namespace []byte) Directive {
 	return DirectiveFunc(func(c *Cache) error {
-		SetCache(c, c.VaryNamesapce(namespace))
+		SetCache(c, c.Migrate(namespace))
 		return nil
 	})
 }
@@ -35,8 +35,8 @@ func Prefix(prefix []byte) Directive {
 		return nil
 	})
 }
-func SetCachePrefix(c *Cache, prefix []byte) {
-	c.prefix = prefix
+func SetCacheGroup(c *Cache, group []byte) {
+	c.group = group
 }
 func SetCacheNamespace(c *Cache, namespace []byte) {
 	c.namespace = namespace
@@ -45,8 +45,8 @@ func SetCachePath(c *Cache, path *Path) {
 	c.path = path
 }
 
-func SetCacheRevocable(c *Cache, revocable bool) {
-	c.revocable = revocable
+func SetCacheFlushable(c *Cache, flushable bool) {
+	c.flushable = flushable
 }
 
 func SetCacheStorage(c *Cache, storage *Storage) {

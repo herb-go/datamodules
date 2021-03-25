@@ -9,7 +9,7 @@ import (
 var tokenBeforeNamespace = []byte{':'}
 var tokenBeforeValue = []byte("#")
 var tokenBeforePath = []byte{0}
-var tokenBeforePrefix = []byte{'/'}
+var tokenBeforeGroup = []byte{'/'}
 
 func writeTokenAndData(w io.Writer, token []byte, data []byte) (int, error) {
 	var written int

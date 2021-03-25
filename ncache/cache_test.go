@@ -38,7 +38,7 @@ func newTestCache() *Cache {
 	if err != nil {
 		panic(err)
 	}
-	return New().VaryRevocable(true).VaryStorage(s)
+	return New().VaryFlushable(true).VaryStorage(s)
 }
 
 var TestKey = []byte("testkey")
@@ -53,8 +53,8 @@ func TestCache(t *testing.T) {
 	c := newTestCache().VaryPrefix(namespace)
 	c.storage.VersionTTL = 0
 	defer c.Storage().Stop()
-	if !c.Revocable() {
-		t.Fatal(c.Revocable())
+	if !c.Flushable() {
+		t.Fatal(c.Flushable())
 	}
 	err = c.SetWithTTL(TestKey, TestData, 1)
 	if err != nil {
@@ -103,7 +103,7 @@ func TestCache(t *testing.T) {
 	if bytes.Compare(data, TestData) != 0 {
 		t.Fatal(data)
 	}
-	err = c.Revoke()
+	err = c.Flush()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,8 +138,8 @@ func TestCachedVersionCache(t *testing.T) {
 	var namespace = []byte("namespace")
 	c := newTestCache().VaryPrefix(namespace)
 	defer c.Storage().Stop()
-	if !c.Revocable() {
-		t.Fatal(c.Revocable())
+	if !c.Flushable() {
+		t.Fatal(c.Flushable())
 	}
 	err = c.SetWithTTL(TestKey, TestData, 1)
 	if err != nil {
@@ -188,7 +188,7 @@ func TestCachedVersionCache(t *testing.T) {
 	if bytes.Compare(data, TestData) != 0 {
 		t.Fatal(data)
 	}
-	err = c.Revoke()
+	err = c.Flush()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,10 +219,10 @@ func TestCachedVersionCache(t *testing.T) {
 func TestIrrevocableCache(t *testing.T) {
 	var err error
 	var data []byte
-	c := newTestCache().VaryRevocable(false).VaryPrefix([]byte("namespace"))
+	c := newTestCache().VaryFlushable(false).VaryPrefix([]byte("namespace"))
 	defer c.Storage().Stop()
-	if c.Revocable() {
-		t.Fatal(c.Revocable())
+	if c.Flushable() {
+		t.Fatal(c.Flushable())
 	}
 	err = c.SetWithTTL(TestKey, TestData, 1)
 	if err != nil {
@@ -271,7 +271,7 @@ func TestIrrevocableCache(t *testing.T) {
 	if bytes.Compare(data, TestData) != 0 {
 		t.Fatal(data)
 	}
-	err = c.Revoke()
+	err = c.Flush()
 	if err != herbdata.ErrIrrevocable {
 		t.Fatal(err)
 	}
@@ -296,8 +296,8 @@ func TestCacheOperations(t *testing.T) {
 		t.Fatal(cc)
 	}
 
-	cc = c.VaryRevocable(false)
-	if cc.revocable != false || c.revocable != true {
+	cc = c.VaryFlushable(false)
+	if cc.flushable != false || c.flushable != true {
 		t.Fatal(cc, c)
 	}
 	cc = c.VaryStorage(nil)
@@ -312,9 +312,9 @@ func TestCacheOperations(t *testing.T) {
 	if cc.Equal(c) {
 		t.Fatal(cc, c)
 	}
-	cc = c.VaryStorage(nil).VaryRevocable(false)
+	cc = c.VaryStorage(nil).VaryFlushable(false)
 	c.CopyFrom(cc)
-	if c.revocable != false ||
+	if c.flushable != false ||
 		c.storage != nil {
 		t.Fatal(c)
 	}
@@ -325,7 +325,7 @@ func TestNoVersionStoreCache(t *testing.T) {
 	c := newTestCache()
 	c.storage.VersionStore = nil
 	defer c.Storage().Stop()
-	err = c.Revoke()
+	err = c.Flush()
 	if err != ErrNoVersionStore {
 		t.Fatal()
 	}
@@ -357,8 +357,8 @@ func TestNamespace(t *testing.T) {
 	defer c.Storage().Stop()
 	var testkey = []byte("testkey")
 	var testdata = []byte("testdata")
-	cns1 := c.VaryNamesapce([]byte("ns1"))
-	cns2 := c.VaryNamesapce([]byte("ns2"))
+	cns1 := c.Migrate([]byte("ns1"))
+	cns2 := c.Migrate([]byte("ns2"))
 	cns1sub1 := cns1.Child([]byte("sub1"))
 	cns2sub1 := cns1.Child([]byte("sub1"))
 	must(cns1.SetWithTTL(testkey, testdata, 3600))
@@ -368,7 +368,7 @@ func TestNamespace(t *testing.T) {
 	must(cns1.Delete(testkey))
 	must(cns1sub1.SetWithTTL(testkey, testdata, 3600))
 	shouldEqual(t, testkey, testdata, nil, cns1sub1)
-	must(cns1.Revoke())
+	must(cns1.Flush())
 	shouldNotEqual(t, testkey, testdata, nil, cns1sub1)
 
 }

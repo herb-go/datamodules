@@ -10,16 +10,16 @@ import (
 )
 
 type Cache struct {
-	revocable bool
+	flushable bool
 	namespace []byte
-	prefix    []byte
+	group     []byte
 	path      *Path
 	storage   *Storage
 	promises  []Directive
 }
 
-func (c *Cache) Revocable() bool {
-	return c.revocable
+func (c *Cache) Flushable() bool {
+	return c.flushable
 }
 func (c *Cache) writeNamespace(w io.Writer) error {
 	var err error
@@ -33,7 +33,7 @@ func (c *Cache) writePath(w io.Writer) error {
 }
 func (c *Cache) writeKey(w io.Writer, key []byte) error {
 	var err error
-	_, err = writeTokenAndData(w, tokenBeforePrefix, c.prefix)
+	_, err = writeTokenAndData(w, tokenBeforeGroup, c.group)
 	if err != nil {
 		return err
 	}
@@ -139,8 +139,8 @@ func (c *Cache) setVersion(version []byte) error {
 	return nil
 }
 
-func (c *Cache) Revoke() error {
-	if !c.revocable {
+func (c *Cache) Flush() error {
+	if !c.flushable {
 		return herbdata.ErrIrrevocable
 	}
 	if c.storage.VersionStore == nil {
@@ -158,7 +158,7 @@ func (c *Cache) Get(key []byte) ([]byte, error) {
 	var err error
 	var e *enity
 	var rawkey []byte
-	if c.revocable {
+	if c.flushable {
 		rawkey, version, err = c.getRawkeyAndVersion(key)
 		if err != nil {
 			return nil, err
@@ -170,7 +170,7 @@ func (c *Cache) Get(key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	e, err = loadEnity(data, c.revocable, version)
+	e, err = loadEnity(data, c.flushable, version)
 	if err != nil {
 		if err == ErrEnityTypecodeNotMatch || err == ErrEnityVersionNotMatch {
 			return nil, herbdata.ErrNotFound
@@ -186,7 +186,7 @@ func (c *Cache) SetWithTTL(key []byte, data []byte, ttl int64) error {
 	var err error
 	var e *enity
 	var rawkey []byte
-	if c.revocable {
+	if c.flushable {
 		rawkey, version, err = c.getRawkeyAndVersion(key)
 		if err != nil {
 			return err
@@ -194,7 +194,7 @@ func (c *Cache) SetWithTTL(key []byte, data []byte, ttl int64) error {
 	} else {
 		rawkey = c.rawKey(key)
 	}
-	e = createEnity(c.revocable, version, data)
+	e = createEnity(c.flushable, version, data)
 	buf := bytes.NewBuffer(nil)
 	err = e.SaveTo(buf)
 	if err != nil {
@@ -209,10 +209,10 @@ func (c *Cache) Delete(key []byte) error {
 
 func (c *Cache) Clone() *Cache {
 	return &Cache{
-		revocable: c.revocable,
+		flushable: c.flushable,
 		storage:   c.storage,
 		path:      c.path,
-		prefix:    c.prefix,
+		group:     c.group,
 		namespace: c.namespace,
 		promises:  append([]Directive{}, c.promises...),
 	}
@@ -222,22 +222,25 @@ func (c *Cache) SubCache(name []byte) herbdata.NestableCache {
 	return c.Child(name)
 }
 
-func (c *Cache) VaryRevocable(revocable bool) *Cache {
+func (c *Cache) VaryFlushable(flushable bool) *Cache {
 	cc := c.Clone()
-	cc.revocable = revocable
+	cc.flushable = flushable
 	return cc
 }
 
-func (c *Cache) VaryPrefix(prefix []byte) *Cache {
+func (c *Cache) VaryPrefix(group []byte) *Cache {
 	cc := c.Clone()
-	SetCachePrefix(cc, prefix)
+	SetCacheGroup(cc, group)
 	return cc
 }
-func (c *Cache) VaryNamesapce(namespace []byte) *Cache {
+func (c *Cache) Migrate(namespace []byte) *Cache {
 	cc := c.Clone()
 	SetCacheNamespace(cc, namespace)
+	SetCachePath(cc, nil)
+	SetCacheGroup(cc, nil)
 	return cc
 }
+
 func (c *Cache) VaryMorePromises(promises ...Directive) *Cache {
 	cc := c.Clone()
 	c.promises = append(c.promises, promises...)
@@ -262,8 +265,8 @@ func (c *Cache) ResolvePromises() error {
 
 func (c *Cache) Child(name []byte) *Cache {
 	cc := c.Clone()
-	SetCachePath(cc, cc.path.Append(c.prefix, name))
-	SetCachePrefix(cc, nil)
+	SetCachePath(cc, cc.path.Append(c.group, name))
+	SetCacheGroup(cc, nil)
 	return cc
 }
 func (c *Cache) VaryStorage(storage *Storage) *Cache {
@@ -285,13 +288,13 @@ func (c *Cache) Equal(dst *Cache) bool {
 	if !c.path.Equal(dst.path) {
 		return false
 	}
-	if !bytes.Equal(c.prefix, dst.prefix) {
+	if !bytes.Equal(c.group, dst.group) {
 		return false
 	}
 	if !bytes.Equal(c.namespace, dst.namespace) {
 		return false
 	}
-	return c.revocable == dst.revocable &&
+	return c.flushable == dst.flushable &&
 		c.storage == dst.storage
 }
 
