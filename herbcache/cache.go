@@ -3,34 +3,35 @@ package herbcache
 import "bytes"
 
 type Cache struct {
-	storage Storage
-	config  *Config
-	Parameter
+	storage   Storage
+	config    *Config
+	namespace []byte
+	group     []byte
+	position  *Position
+	flushable bool
 }
 
-func (c *Cache) Get(p *Parameter, key []byte) ([]byte, error) {
-	return c.storage.ExecuteGet(p, key)
+func (c *Cache) Get(key []byte) ([]byte, error) {
+	return c.storage.ExecuteGet(c, key)
 }
-func (c *Cache) SetWithTTL(p *Parameter, key []byte, data []byte, ttl int64) error {
-	return c.storage.ExecuteSetWithTTL(p, key, data, ttl)
+func (c *Cache) SetWithTTL(key []byte, data []byte, ttl int64) error {
+	return c.storage.ExecuteSetWithTTL(c, key, data, ttl)
 }
-func (c *Cache) Delete(p *Parameter, key []byte) error {
-	return c.storage.ExecuteDelete(p, key)
+func (c *Cache) Delete(key []byte) error {
+	return c.storage.ExecuteDelete(c, key)
 }
-func (c *Cache) Flush(p *Parameter) error {
-	return c.storage.ExecuteFlush(p)
+func (c *Cache) Flush() error {
+	return c.storage.ExecuteFlush(c)
 }
 
 func (c *Cache) Clone() *Cache {
 	return &Cache{
-		storage: c.storage,
-		Parameter: Parameter{
-			namespace: c.namespace,
-			group:     c.group,
-			position:  c.position,
-			flushable: c.flushable,
-		},
-		config: c.config,
+		storage:   c.storage,
+		namespace: c.namespace,
+		group:     c.group,
+		position:  c.position,
+		flushable: c.flushable,
+		config:    c.config,
 	}
 }
 func (c *Cache) Equal(dst *Cache) bool {

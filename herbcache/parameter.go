@@ -1,8 +1,8 @@
 package herbcache
 
-type Parameter struct {
-	namespace []byte
-	group     []byte
-	position  *Position
-	flushable bool
+type Parameter interface {
+	Namespace() []byte
+	Group() []byte
+	Position() *Position
+	Flushable() bool
 }
