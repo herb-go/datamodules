@@ -31,9 +31,3 @@ func NewConfig(d ...Directive) *Config {
 	var c *Config
 	return c.Extend(d...)
 }
-
-func LazyCache(d ...Directive) *Cache {
-	c := New()
-	c.config = NewConfig(d...)
-	return c
-}

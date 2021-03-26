@@ -61,7 +61,7 @@ func (c *Cache) Namespace() []byte {
 	return c.namespace
 }
 
-func (c *Cache) VaryGroup(group []byte) *Cache {
+func (c *Cache) OverrideGroup(group []byte) *Cache {
 	cc := c.Clone()
 	SetCacheGroup(cc, group)
 	return cc
@@ -75,7 +75,7 @@ func (c *Cache) Position() *Position {
 	return c.position
 }
 
-func (c *Cache) VaryFlushable(flushable bool) *Cache {
+func (c *Cache) OverrideFlushable(flushable bool) *Cache {
 	cc := c.Clone()
 	SetCacheFlushable(cc, flushable)
 	return cc
@@ -85,7 +85,7 @@ func (c *Cache) Flushable() bool {
 	return c.flushable
 }
 
-func (c *Cache) InLazy() bool {
+func (c *Cache) IsPreparing() bool {
 	return c.config == nil
 }
 
@@ -96,6 +96,11 @@ func (c *Cache) Ready() error {
 }
 func New() *Cache {
 	return &Cache{}
+}
+func Prepare(d ...Directive) *Cache {
+	c := New()
+	c.config = NewConfig(d...)
+	return c
 }
 
 func SetCacheStorage(c *Cache, s Storage) {
