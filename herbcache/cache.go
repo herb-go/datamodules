@@ -103,6 +103,15 @@ func (c *Cache) Ready() error {
 	c.pending = nil
 	return p.Resolve(c)
 }
+
+func (c *Cache) Execute(dst *Cache) error {
+	err := dst.Ready()
+	if err != nil {
+		return err
+	}
+	c.CopyFrom(dst)
+	return nil
+}
 func New() *Cache {
 	return &Cache{
 		storage: DefaultStorage,
