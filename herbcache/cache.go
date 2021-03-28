@@ -73,6 +73,12 @@ func (c *Cache) Group() []byte {
 	return c.group
 }
 
+func (c *Cache) SubCache(name []byte) *Cache {
+	cc := c.Clone()
+	SetCachePosition(cc, c.position.Append(c.group, name))
+	SetCacheGroup(cc, nil)
+	return cc
+}
 func (c *Cache) Position() *Position {
 	return c.position
 }
@@ -97,7 +103,9 @@ func (c *Cache) Ready() error {
 	return p.Resolve(c)
 }
 func New() *Cache {
-	return &Cache{}
+	return &Cache{
+		storage: &NopStorage{},
+	}
 }
 func Prepare(d ...Directive) *Cache {
 	c := New()
