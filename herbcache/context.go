@@ -1,6 +1,6 @@
 package herbcache
 
-type Parameter interface {
+type Context interface {
 	Namespace() []byte
 	Group() []byte
 	Position() *Position

@@ -4,7 +4,7 @@ import "bytes"
 
 type Cache struct {
 	storage   Storage
-	config    *Config
+	pending   *Pending
 	namespace []byte
 	group     []byte
 	position  *Position
@@ -24,15 +24,16 @@ func (c *Cache) Flush() error {
 	return c.storage.ExecuteFlush(c)
 }
 
-func (c *Cache) Clone() *Cache {
-	return &Cache{
-		storage:   c.storage,
-		namespace: c.namespace,
-		group:     c.group,
-		position:  c.position,
-		flushable: c.flushable,
-		config:    c.config,
-	}
+func (c Cache) Clone() *Cache {
+	return &c
+	// return &Cache{
+	// 	storage:   c.storage,
+	// 	namespace: c.namespace,
+	// 	group:     c.group,
+	// 	position:  c.position,
+	// 	flushable: c.flushable,
+	// 	config:    c.config,
+	// }
 }
 func (c *Cache) Equal(dst *Cache) bool {
 	if dst == nil || c == nil {
@@ -87,20 +88,20 @@ func (c *Cache) Flushable() bool {
 }
 
 func (c *Cache) IsPreparing() bool {
-	return c.config == nil
+	return c.pending == nil
 }
 
 func (c *Cache) Ready() error {
-	conf := c.config
-	c.config = nil
-	return conf.ApplyTo(c)
+	p := c.pending
+	c.pending = nil
+	return p.Resolve(c)
 }
 func New() *Cache {
 	return &Cache{}
 }
 func Prepare(d ...Directive) *Cache {
 	c := New()
-	c.config = NewConfig(d...)
+	c.pending = Pend(d...)
 	return c
 }
 
@@ -125,8 +126,8 @@ func SetCacheFlushable(c *Cache, flushable bool) {
 func SetCache(c *Cache, dst *Cache) {
 	*c = *dst
 }
-func SetCacheConfig(c *Cache, p *Config) {
-	c.config = p
+func SetCachePending(c *Cache, p *Pending) {
+	c.pending = p
 }
 func Copy(src *Cache, dst *Cache) {
 	SetCache(src, dst.Clone())
