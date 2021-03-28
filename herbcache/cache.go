@@ -26,14 +26,6 @@ func (c *Cache) Flush() error {
 
 func (c Cache) Clone() *Cache {
 	return &c
-	// return &Cache{
-	// 	storage:   c.storage,
-	// 	namespace: c.namespace,
-	// 	group:     c.group,
-	// 	position:  c.position,
-	// 	flushable: c.flushable,
-	// 	config:    c.config,
-	// }
 }
 func (c *Cache) Equal(dst *Cache) bool {
 	if dst == nil || c == nil {
@@ -92,11 +84,20 @@ func (c *Cache) OverrideFlushable(flushable bool) *Cache {
 func (c *Cache) Flushable() bool {
 	return c.flushable
 }
-
+func (c *Cache) OverrideStorage(storage Storage) *Cache {
+	cc := c.Clone()
+	SetCacheStorage(cc, storage)
+	return cc
+}
+func (c *Cache) Storage() Storage {
+	return c.storage
+}
 func (c *Cache) IsPreparing() bool {
 	return c.pending == nil
 }
-
+func (c *Cache) CopyFrom(cc *Cache) {
+	Copy(c, cc)
+}
 func (c *Cache) Ready() error {
 	p := c.pending
 	c.pending = nil
@@ -104,7 +105,7 @@ func (c *Cache) Ready() error {
 }
 func New() *Cache {
 	return &Cache{
-		storage: &NopStorage{},
+		storage: DefaultStorage,
 	}
 }
 func Prepare(d ...Directive) *Cache {

@@ -21,3 +21,5 @@ func (s *NopStorage) ExecuteDelete(c Context, key []byte) error {
 func (s *NopStorage) ExecuteFlush(c Context) error {
 	return ErrStorageRequired
 }
+
+var DefaultStorage = &NopStorage{}
