@@ -47,6 +47,7 @@ func (c *Cache) Equal(dst *Cache) bool {
 func (c *Cache) Migrate(namespace []byte) *Cache {
 	cc := c.Clone()
 	SetCacheNamespace(cc, namespace)
+	SetCachePosition(cc, nil)
 	SetCacheGroup(cc, nil)
 	return cc
 }
@@ -93,7 +94,7 @@ func (c *Cache) Storage() Storage {
 	return c.storage
 }
 func (c *Cache) IsPreparing() bool {
-	return c.pending == nil
+	return c.pending != nil
 }
 func (c *Cache) CopyFrom(cc *Cache) {
 	Copy(c, cc)
@@ -105,11 +106,11 @@ func (c *Cache) Ready() error {
 }
 
 func (c *Cache) Execute(dst *Cache) error {
-	err := dst.Ready()
+	err := c.Ready()
 	if err != nil {
 		return err
 	}
-	c.CopyFrom(dst)
+	dst.CopyFrom(c)
 	return nil
 }
 func New() *Cache {

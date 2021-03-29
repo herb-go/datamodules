@@ -141,7 +141,7 @@ func (c *Cache) setVersion(version []byte) error {
 
 func (c *Cache) Flush() error {
 	if !c.flushable {
-		return herbdata.ErrIrrevocable
+		return herbdata.ErrNotFlushable
 	}
 	if c.storage.VersionStore == nil {
 		return ErrNoVersionStore

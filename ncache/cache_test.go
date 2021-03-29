@@ -272,7 +272,7 @@ func TestIrrevocableCache(t *testing.T) {
 		t.Fatal(data)
 	}
 	err = c.Flush()
-	if err != herbdata.ErrIrrevocable {
+	if err != herbdata.ErrNotFlushable {
 		t.Fatal(err)
 	}
 }

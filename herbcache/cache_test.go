@@ -49,14 +49,63 @@ func TestCacheOperations(t *testing.T) {
 	if cc.Equal(c) {
 		t.Fatal(cc, c)
 	}
+	if c.Position() != nil {
+		t.Fatal()
+	}
+	cc = c.Migrate([]byte("newns")).SubCache([]byte("child")).OverrideGroup([]byte("group")).Migrate(nil)
+	if c.Position() != nil || c.Namespace() != nil || c.Group() != nil {
+		t.Fatal()
+	}
 	cc = c.SubCache([]byte("child")).OverrideGroup([]byte("group"))
 	if cc.Equal(c) {
 		t.Fatal(cc, c)
+	}
+	if cc.Position() == nil {
+		t.Fatal()
 	}
 	cc = c.OverrideStorage(nil).OverrideFlushable(false)
 	c.CopyFrom(cc)
 	if c.flushable != false ||
 		c.storage != nil {
 		t.Fatal(c)
+	}
+}
+
+func TestPending(t *testing.T) {
+	c := New()
+	if c.IsPreparing() {
+		t.Fatal()
+	}
+	var p *Pending
+	SetCachePending(c, p)
+	if c.IsPreparing() {
+		t.Fatal()
+	}
+	p = p.Extend(Group([]byte("g")))
+	SetCachePending(c, p)
+	if !c.IsPreparing() {
+		t.Fatal()
+	}
+	SetCachePending(c, nil)
+	if c.IsPreparing() {
+		t.Fatal()
+	}
+	SetCachePending(c, p)
+	if len(c.Group()) != 0 {
+		t.Fatal()
+	}
+	cc := Prepare(c)
+	if !c.IsPreparing() {
+		t.Fatal()
+	}
+	if !cc.IsPreparing() {
+		t.Fatal()
+	}
+	err := cc.Ready()
+	if err != nil {
+		panic(err)
+	}
+	if cc.IsPreparing() || !bytes.Equal(c.Group(), []byte("g")) {
+		t.Fatal()
 	}
 }

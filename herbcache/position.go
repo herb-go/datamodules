@@ -15,11 +15,10 @@ func (p *Position) Equal(dst *Position) bool {
 		return p == dst
 	}
 
-	if !bytes.Equal(p.Name, dst.Name) {
+	if !p.Parent.Equal(dst.Parent) {
 		return false
 	}
-	return p.Parent.Equal(dst.Parent)
-
+	return bytes.Equal(p.Name, dst.Name) && bytes.Equal(p.Group, dst.Group)
 }
 func (p *Position) RootDirectory() *Directory {
 	return p.toPath(nil)
