@@ -218,10 +218,6 @@ func (c *Cache) Clone() *Cache {
 	}
 }
 
-func (c *Cache) SubCache(name []byte) herbdata.NestableCache {
-	return c.Child(name)
-}
-
 func (c *Cache) VaryFlushable(flushable bool) *Cache {
 	cc := c.Clone()
 	cc.flushable = flushable

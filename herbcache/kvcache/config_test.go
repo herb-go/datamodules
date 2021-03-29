@@ -3,6 +3,7 @@ package kvcache
 import (
 	"testing"
 
+	"github.com/herb-go/datamodules/herbcache"
 	"github.com/herb-go/herbdata/kvdb"
 	"github.com/herb-go/herbdata/kvdb/commonkvdb"
 )
@@ -30,7 +31,7 @@ func newTestDriverConfig(feature kvdb.Feature) *StorageConfig {
 	return config
 }
 
-func getCacheVersionStoreDirver(s *Storage) kvdb.Driver {
+func getCacheVersionStoreDirver(s *Engine) kvdb.Driver {
 	return s.VersionStore.(*kvdb.Database).Driver
 }
 func init() {
@@ -47,48 +48,53 @@ func init() {
 func TestConfig(t *testing.T) {
 	var err error
 	var config *StorageConfig
-	var s *Storage
+	var s *herbcache.Storage
 	config = newTestDriverConfig(0)
-	s, err = config.Create()
+	s = herbcache.NewStorage()
+	err = config.ApplyTo(s)
 	if err != kvdb.ErrFeatureNotSupported {
 		t.Fatal()
 	}
 	config = newTestDriverConfig(kvdb.FeatureTTLStore)
-	s, err = config.Create()
+	s = herbcache.NewStorage()
+	err = config.ApplyTo(s)
 	if err != nil {
 		panic(err)
 	}
-	if s.VersionStore != nil {
+	if s.Engine.(*Engine).VersionStore != nil {
 		t.Fatal()
 	}
 	config = newTestDriverConfig(kvdb.FeatureTTLStore | kvdb.FeatureStore)
-	s, err = config.Create()
+	s = herbcache.NewStorage()
+	err = config.ApplyTo(s)
 	if err != nil {
 		panic(err)
 	}
-	if s.VersionStore == nil {
+	if s.Engine.(*Engine).VersionStore == nil {
 		t.Fatal()
 	}
-	if _, ok := getCacheVersionStoreDirver(s).(testDriver); !ok {
+	if _, ok := getCacheVersionStoreDirver(s.Engine.(*Engine)).(testDriver); !ok {
 		t.Fatal()
 	}
 	config = newTestDriverConfig(kvdb.FeatureTTLStore | kvdb.FeatureStore | kvdb.FeatureUnstable)
-	s, err = config.Create()
+	s = herbcache.NewStorage()
+	err = config.ApplyTo(s)
 	if err != nil {
 		panic(err)
 	}
-	if s.VersionStore != nil {
+	if s.Engine.(*Engine).VersionStore != nil {
 		t.Fatal()
 	}
 	config = newTestDriverConfig(kvdb.FeatureTTLStore | kvdb.FeatureEmbedded | kvdb.FeatureNonpersistent)
-	s, err = config.Create()
+	s = herbcache.NewStorage()
+	err = config.ApplyTo(s)
 	if err != nil {
 		panic(err)
 	}
-	if s.VersionStore == nil {
+	if s.Engine.(*Engine).VersionStore == nil {
 		t.Fatal()
 	}
-	if _, ok := getCacheVersionStoreDirver(s).(*commonkvdb.InMemory); !ok {
+	if _, ok := getCacheVersionStoreDirver(s.Engine.(*Engine)).(*commonkvdb.InMemory); !ok {
 		t.Fatal()
 	}
 }

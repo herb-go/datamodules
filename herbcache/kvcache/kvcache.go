@@ -8,29 +8,29 @@ import (
 	"github.com/herb-go/herbdata/datautil"
 )
 
-type Storage struct {
+type Engine struct {
 	VersionGenerator func() (string, error)
 	VersionTTL       int64
 	VersionStore     herbdata.SetterGetterServer
 	Cache            herbdata.CacheServer
 }
 
-func (s *Storage) Start() error {
-	if s.VersionStore != nil {
-		err := s.VersionStore.Start()
+func (e *Engine) Start() error {
+	if e.VersionStore != nil {
+		err := e.VersionStore.Start()
 		if err != nil {
 			return err
 		}
 	}
-	return s.Cache.Start()
+	return e.Cache.Start()
 }
-func (s *Storage) Stop() error {
+func (e *Engine) Stop() error {
 	var vererr error
 	var err error
-	if s.VersionStore != nil {
-		vererr = s.VersionStore.Stop()
+	if e.VersionStore != nil {
+		vererr = e.VersionStore.Stop()
 	}
-	err = s.Cache.Stop()
+	err = e.Cache.Stop()
 	if vererr != nil {
 		return vererr
 	}
@@ -39,7 +39,7 @@ func (s *Storage) Stop() error {
 	}
 	return nil
 }
-func (s *Storage) rawKey(c herbcache.Context, key []byte) []byte {
+func (e *Engine) rawKey(c herbcache.Context, key []byte) []byte {
 	var err error
 	buf := bytes.NewBuffer(nil)
 	_, err = herbcache.WriteNamespace(buf, c.Namespace())
@@ -56,33 +56,33 @@ func (s *Storage) rawKey(c herbcache.Context, key []byte) []byte {
 	}
 	return buf.Bytes()
 }
-func (s *Storage) loadVersion(key []byte, cacheable bool) ([]byte, error) {
+func (e *Engine) loadVersion(key []byte, cacheable bool) ([]byte, error) {
 	if cacheable {
-		return s.getCachedVersion(key)
+		return e.getCachedVersion(key)
 	}
-	return s.LoadRawVersion(key)
+	return e.LoadRawVersion(key)
 }
-func (s *Storage) getCachedVersion(key []byte) ([]byte, error) {
-	version, err := s.Cache.Get(key)
+func (e *Engine) getCachedVersion(key []byte) ([]byte, error) {
+	version, err := e.Cache.Get(key)
 	if err == nil {
 		return version, nil
 	}
 	if err != herbdata.ErrNotFound {
 		return nil, err
 	}
-	version, err = s.LoadRawVersion(key)
+	version, err = e.LoadRawVersion(key)
 	if err != nil {
 		return nil, err
 	}
-	err = s.Cache.SetWithTTL(key, version, s.VersionTTL)
+	err = e.Cache.SetWithTTL(key, version, e.VersionTTL)
 	if err != nil {
 		return nil, err
 	}
 	return version, nil
 }
 
-func (s *Storage) LoadRawVersion(key []byte) ([]byte, error) {
-	v, err := s.VersionStore.Get(key)
+func (e *Engine) LoadRawVersion(key []byte) ([]byte, error) {
+	v, err := e.VersionStore.Get(key)
 	if err == nil {
 		return v, nil
 	}
@@ -91,7 +91,7 @@ func (s *Storage) LoadRawVersion(key []byte) ([]byte, error) {
 	}
 	return nil, err
 }
-func (s *Storage) getRawkeyAndVersion(c herbcache.Context, key []byte) ([]byte, []byte, error) {
+func (e *Engine) getRawkeyAndVersion(c herbcache.Context, key []byte) ([]byte, []byte, error) {
 	var err error
 	versionbuf := bytes.NewBuffer(nil)
 	keybuf := bytes.NewBuffer(nil)
@@ -99,7 +99,7 @@ func (s *Storage) getRawkeyAndVersion(c herbcache.Context, key []byte) ([]byte, 
 	if err != nil {
 		panic(err)
 	}
-	cacheable := s.VersionTTL > 0 && s.VersionStore != nil
+	cacheable := e.VersionTTL > 0 && e.VersionStore != nil
 	d := c.Position().RootDirectory()
 	for d != nil {
 		_, err = herbcache.WriteDirectory(keybuf, d)
@@ -107,7 +107,7 @@ func (s *Storage) getRawkeyAndVersion(c herbcache.Context, key []byte) ([]byte, 
 			return nil, nil, err
 		}
 		currentkey := keybuf.Bytes()
-		v, err := s.loadVersion(currentkey, cacheable)
+		v, err := e.loadVersion(currentkey, cacheable)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -124,9 +124,9 @@ func (s *Storage) getRawkeyAndVersion(c herbcache.Context, key []byte) ([]byte, 
 	}
 	return keybuf.Bytes(), versionbuf.Bytes(), nil
 }
-func (s *Storage) setVersion(c herbcache.Context, version []byte) error {
+func (e *Engine) setVersion(c herbcache.Context, version []byte) error {
 	var err error
-	cacheable := s.VersionTTL > 0 && s.VersionStore != nil
+	cacheable := e.VersionTTL > 0 && e.VersionStore != nil
 	keybuf := bytes.NewBuffer(nil)
 	_, err = herbcache.WriteNamespace(keybuf, c.Namespace())
 	if err != nil {
@@ -137,85 +137,85 @@ func (s *Storage) setVersion(c herbcache.Context, version []byte) error {
 		return err
 	}
 	key := keybuf.Bytes()
-	err = s.VersionStore.Set(key, version)
+	err = e.VersionStore.Set(key, version)
 	if err != nil {
 		return err
 	}
 	if cacheable {
-		return s.Cache.Delete(key)
+		return e.Cache.Delete(key)
 	}
 	return nil
 }
-func (s *Storage) ExecuteGet(c herbcache.Context, key []byte) ([]byte, error) {
+func (e *Engine) ExecuteGet(c herbcache.Context, key []byte) ([]byte, error) {
 	var data []byte
 	var version []byte
 	var err error
-	var e *enity
+	var ent *enity
 	var rawkey []byte
 	flushable := c.Flushable()
 	if flushable {
-		rawkey, version, err = s.getRawkeyAndVersion(c, key)
+		rawkey, version, err = e.getRawkeyAndVersion(c, key)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		rawkey = s.rawKey(c, key)
+		rawkey = e.rawKey(c, key)
 	}
-	data, err = s.Cache.Get(rawkey)
+	data, err = e.Cache.Get(rawkey)
 	if err != nil {
 		return nil, err
 	}
-	e, err = loadEnity(data, flushable, version)
+	ent, err = loadEnity(data, flushable, version)
 	if err != nil {
 		if err == ErrEnityTypecodeNotMatch || err == ErrEnityVersionNotMatch {
 			return nil, herbdata.ErrNotFound
 		}
 		return nil, err
 	}
-	return e.data, nil
+	return ent.data, nil
 }
-func (s *Storage) ExecuteSetWithTTL(c herbcache.Context, key []byte, data []byte, ttl int64) error {
+func (e *Engine) ExecuteSetWithTTL(c herbcache.Context, key []byte, data []byte, ttl int64) error {
 	var version []byte
 	var err error
-	var e *enity
+	var ent *enity
 	var rawkey []byte
 	flushable := c.Flushable()
 	if flushable {
-		rawkey, version, err = s.getRawkeyAndVersion(c, key)
+		rawkey, version, err = e.getRawkeyAndVersion(c, key)
 		if err != nil {
 			return err
 		}
 	} else {
-		rawkey = s.rawKey(c, key)
+		rawkey = e.rawKey(c, key)
 	}
-	e = createEnity(flushable, version, data)
+	ent = createEnity(flushable, version, data)
 	buf := bytes.NewBuffer(nil)
-	err = e.SaveTo(buf)
+	err = ent.SaveTo(buf)
 	if err != nil {
 		return err
 	}
-	return s.Cache.SetWithTTL(rawkey, buf.Bytes(), ttl)
+	return e.Cache.SetWithTTL(rawkey, buf.Bytes(), ttl)
 }
-func (s *Storage) ExecuteDelete(c herbcache.Context, key []byte) error {
-	return s.Cache.Delete(s.rawKey(c, key))
+func (e *Engine) ExecuteDelete(c herbcache.Context, key []byte) error {
+	return e.Cache.Delete(e.rawKey(c, key))
 }
-func (s *Storage) ExecuteFlush(c herbcache.Context) error {
+func (e *Engine) ExecuteFlush(c herbcache.Context) error {
 	if !c.Flushable() {
 		return herbdata.ErrNotFlushable
 	}
-	if s.VersionStore == nil {
+	if e.VersionStore == nil {
 		return ErrNoVersionStore
 	}
-	v, err := s.VersionGenerator()
+	v, err := e.VersionGenerator()
 	if err != nil {
 		return err
 	}
-	return s.setVersion(c, []byte(v))
+	return e.setVersion(c, []byte(v))
 
 }
 
-func New() *Storage {
-	return &Storage{
+func New() *Engine {
+	return &Engine{
 		VersionGenerator: DefaultVersionGenerator,
 	}
 }

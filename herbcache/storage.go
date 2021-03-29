@@ -1,6 +1,6 @@
 package herbcache
 
-type Storage interface {
+type Engine interface {
 	Start() error
 	Stop() error
 	ExecuteGet(c Context, key []byte) ([]byte, error)
@@ -8,26 +8,41 @@ type Storage interface {
 	ExecuteDelete(c Context, key []byte) error
 	ExecuteFlush(c Context) error
 }
+type Storage struct {
+	Engine
+}
 
-type NopStorage struct{}
+func (s *Storage) Execute(c *Cache) error {
+	SetCache(c, c.OverrideStorage(s))
+	return nil
 
-func (s *NopStorage) Start() error {
+}
+
+type NopEngine struct{}
+
+func (s *NopEngine) Start() error {
 	return ErrStorageRequired
 }
-func (s *NopStorage) Stop() error {
+func (s *NopEngine) Stop() error {
 	return ErrStorageRequired
 }
-func (s *NopStorage) ExecuteGet(c Context, key []byte) ([]byte, error) {
+func (s *NopEngine) ExecuteGet(c Context, key []byte) ([]byte, error) {
 	return nil, ErrStorageRequired
 }
-func (s *NopStorage) ExecuteSetWithTTL(c Context, key []byte, data []byte, ttl int64) error {
+func (s *NopEngine) ExecuteSetWithTTL(c Context, key []byte, data []byte, ttl int64) error {
 	return ErrStorageRequired
 }
-func (s *NopStorage) ExecuteDelete(c Context, key []byte) error {
+func (s *NopEngine) ExecuteDelete(c Context, key []byte) error {
 	return ErrStorageRequired
 }
-func (s *NopStorage) ExecuteFlush(c Context) error {
+func (s *NopEngine) ExecuteFlush(c Context) error {
 	return ErrStorageRequired
 }
 
-var DefaultStorage = &NopStorage{}
+var DefaultEngine = &NopEngine{}
+
+func NewStorage() *Storage {
+	return &Storage{
+		Engine: DefaultEngine,
+	}
+}

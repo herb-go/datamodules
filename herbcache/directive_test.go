@@ -3,7 +3,7 @@ package herbcache
 import "testing"
 
 func TestDirective(t *testing.T) {
-	s := &testStorage{}
+	s := newTestStorage()
 	c := New()
 	cc := New()
 	if !c.Equal(cc) {
@@ -16,7 +16,7 @@ func TestDirective(t *testing.T) {
 	if cc.IsPreparing() {
 		t.Fatal()
 	}
-	cc = Prepare(cc, Migrate([]byte("ns")), Flushable(true), Group([]byte("g")), Use(s), SubCache([]byte("sub")))
+	cc = Prepare(cc, Migrate([]byte("ns")), Flushable(true), Group([]byte("g")), s, SubCache([]byte("sub")))
 	if c.Equal(cc) {
 		t.Fatal()
 	}

@@ -183,17 +183,19 @@ func newTestStorage() *testStorage {
 	}
 }
 
-func newStorage() *namespaces {
-	return &namespaces{
+func newStorage() *herbcache.Storage {
+	s := herbcache.NewStorage()
+	s.Engine = &namespaces{
 		storages: map[string]*testStorage{},
 	}
+	return s
 }
 
-func factory() herbcache.Storage {
+func factory() *herbcache.Storage {
 	return newStorage()
 }
 
 func TestTool(t *testing.T) {
-	TestNotFlushable(factory, func(herbcache.Storage) {}, func(v ...interface{}) { t.Fatal(v...) })
-	TestFlushable(factory, func(herbcache.Storage) {}, func(v ...interface{}) { t.Fatal(v...) })
+	TestNotFlushable(factory, func(*herbcache.Storage) {}, func(v ...interface{}) { t.Fatal(v...) })
+	TestFlushable(factory, func(*herbcache.Storage) {}, func(v ...interface{}) { t.Fatal(v...) })
 }

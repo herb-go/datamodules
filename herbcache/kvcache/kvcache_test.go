@@ -11,7 +11,8 @@ import (
 	_ "github.com/herb-go/herbdata/kvdb/commonkvdb"
 )
 
-var factory = func() herbcache.Storage {
+var factory = func() *herbcache.Storage {
+	s := herbcache.NewStorage()
 	config := &StorageConfig{
 		Cache: &kvdb.Config{
 			Driver: "freecache",
@@ -25,21 +26,21 @@ var factory = func() herbcache.Storage {
 		},
 	}
 
-	s, err := config.Create()
+	err := config.ApplyTo(s)
 	if err != nil {
 		panic(err)
 	}
 	return s
 }
 
-func novcachefactory() herbcache.Storage {
+func novcachefactory() *herbcache.Storage {
 	s := factory()
-	s.(*Storage).VersionTTL = 0
+	s.Engine.(*Engine).VersionTTL = 0
 	return s
 }
 func TestKVCache(t *testing.T) {
-	storagetestutil.TestNotFlushable(factory, func(herbcache.Storage) {}, func(v ...interface{}) { t.Fatal(v...) })
-	storagetestutil.TestFlushable(factory, func(herbcache.Storage) {}, func(v ...interface{}) { t.Fatal(v...) })
-	storagetestutil.TestFlushable(novcachefactory, func(herbcache.Storage) {}, func(v ...interface{}) { t.Fatal(v...) })
+	storagetestutil.TestNotFlushable(factory, func(*herbcache.Storage) {}, func(v ...interface{}) { t.Fatal(v...) })
+	storagetestutil.TestFlushable(factory, func(*herbcache.Storage) {}, func(v ...interface{}) { t.Fatal(v...) })
+	storagetestutil.TestFlushable(factory, func(*herbcache.Storage) {}, func(v ...interface{}) { t.Fatal(v...) })
 
 }

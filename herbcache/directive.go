@@ -35,10 +35,3 @@ func Group(group []byte) Directive {
 		return nil
 	})
 }
-
-func Use(s Storage) Directive {
-	return DirectiveFunc(func(c *Cache) error {
-		SetCache(c, c.OverrideStorage(s))
-		return nil
-	})
-}

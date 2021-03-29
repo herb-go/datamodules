@@ -7,7 +7,7 @@ import (
 	"github.com/herb-go/herbdata"
 )
 
-func TestNotFlushable(creator func() herbcache.Storage, closer func(herbcache.Storage), fatal func(...interface{})) {
+func TestNotFlushable(creator func() *herbcache.Storage, closer func(*herbcache.Storage), fatal func(...interface{})) {
 	var data []byte
 	var err error
 	s := creator()
@@ -169,7 +169,7 @@ func TestNotFlushable(creator func() herbcache.Storage, closer func(herbcache.St
 	}
 }
 
-func TestFlushable(creator func() herbcache.Storage, closer func(herbcache.Storage), fatal func(...interface{})) {
+func TestFlushable(creator func() *herbcache.Storage, closer func(*herbcache.Storage), fatal func(...interface{})) {
 	var data []byte
 	var err error
 	s := creator()

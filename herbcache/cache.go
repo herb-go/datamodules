@@ -3,7 +3,7 @@ package herbcache
 import "bytes"
 
 type Cache struct {
-	storage   Storage
+	storage   *Storage
 	pending   *Pending
 	namespace []byte
 	group     []byte
@@ -41,7 +41,7 @@ func (c *Cache) Equal(dst *Cache) bool {
 		return false
 	}
 	return c.flushable == dst.flushable &&
-		c.storage == dst.storage
+		c.storage.Engine == dst.storage.Engine
 }
 
 func (c *Cache) Migrate(namespace []byte) *Cache {
@@ -85,12 +85,12 @@ func (c *Cache) OverrideFlushable(flushable bool) *Cache {
 func (c *Cache) Flushable() bool {
 	return c.flushable
 }
-func (c *Cache) OverrideStorage(storage Storage) *Cache {
+func (c *Cache) OverrideStorage(storage *Storage) *Cache {
 	cc := c.Clone()
 	SetCacheStorage(cc, storage)
 	return cc
 }
-func (c *Cache) Storage() Storage {
+func (c *Cache) Storage() *Storage {
 	return c.storage
 }
 func (c *Cache) IsPreparing() bool {
@@ -115,7 +115,7 @@ func (c *Cache) Execute(dst *Cache) error {
 }
 func New() *Cache {
 	return &Cache{
-		storage: DefaultStorage,
+		storage: NewStorage(),
 	}
 }
 func Prepare(d ...Directive) *Cache {
@@ -124,7 +124,7 @@ func Prepare(d ...Directive) *Cache {
 	return c
 }
 
-func SetCacheStorage(c *Cache, s Storage) {
+func SetCacheStorage(c *Cache, s *Storage) {
 	c.storage = s
 }
 func SetCacheNamespace(c *Cache, namespace []byte) {

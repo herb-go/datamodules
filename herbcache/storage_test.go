@@ -5,7 +5,7 @@ import "testing"
 func TestNop(t *testing.T) {
 	c := New()
 
-	if c.Storage() != DefaultStorage {
+	if c.Storage().Engine != DefaultEngine {
 		t.Fatal(c)
 	}
 	err := c.Storage().Start()

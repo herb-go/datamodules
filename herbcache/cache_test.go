@@ -5,13 +5,13 @@ import (
 	"testing"
 )
 
-type testStorage struct {
-	NopStorage
+func newTestStorage() *Storage {
+	s := NewStorage()
+	return s
 }
-
 func TestCacheOperations(t *testing.T) {
 	var cc *Cache
-	s := &testStorage{}
+	s := newTestStorage()
 	c := New().OverrideStorage(s).OverrideFlushable(true)
 	if c.Storage() != s {
 		t.Fatal(c)
