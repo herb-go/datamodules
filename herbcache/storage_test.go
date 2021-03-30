@@ -2,6 +2,8 @@ package herbcache
 
 import "testing"
 
+var s StorageProvider = New()
+
 func TestNop(t *testing.T) {
 	c := New()
 

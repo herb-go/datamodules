@@ -71,41 +71,15 @@ func TestCacheOperations(t *testing.T) {
 	}
 }
 
-func TestPending(t *testing.T) {
+func TestStringCache(t *testing.T) {
 	c := New()
-	if c.IsPreparing() {
+	if !c.OverrideGroup([]byte("g")).Equal(c.PrefixCache("g")) {
 		t.Fatal()
 	}
-	var p *Pending
-	SetCachePending(c, p)
-	if c.IsPreparing() {
+	if !c.SubCache([]byte("sub")).Equal(c.ChildCache("sub")) {
 		t.Fatal()
 	}
-	p = p.Extend(Group([]byte("g")))
-	SetCachePending(c, p)
-	if !c.IsPreparing() {
-		t.Fatal()
-	}
-	SetCachePending(c, nil)
-	if c.IsPreparing() {
-		t.Fatal()
-	}
-	SetCachePending(c, p)
-	if len(c.Group()) != 0 {
-		t.Fatal()
-	}
-	cc := Prepare(c)
-	if !c.IsPreparing() {
-		t.Fatal()
-	}
-	if !cc.IsPreparing() {
-		t.Fatal()
-	}
-	err := cc.Ready()
-	if err != nil {
-		panic(err)
-	}
-	if cc.IsPreparing() || !bytes.Equal(c.Group(), []byte("g")) {
+	if !VirtualCache(c, "ns").Equal(c.Migrate([]byte("ns"))) {
 		t.Fatal()
 	}
 }

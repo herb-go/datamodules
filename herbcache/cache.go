@@ -4,7 +4,6 @@ import "bytes"
 
 type Cache struct {
 	storage   *Storage
-	pending   *Pending
 	namespace []byte
 	group     []byte
 	position  *Position
@@ -61,6 +60,9 @@ func (c *Cache) OverrideGroup(group []byte) *Cache {
 	SetCacheGroup(cc, group)
 	return cc
 }
+func (c *Cache) PrefixCache(prefix string) *Cache {
+	return c.OverrideGroup([]byte(prefix))
+}
 
 func (c *Cache) Group() []byte {
 	return c.group
@@ -71,6 +73,10 @@ func (c *Cache) SubCache(name []byte) *Cache {
 	SetCachePosition(cc, c.position.Append(c.group, name))
 	SetCacheGroup(cc, nil)
 	return cc
+}
+
+func (c *Cache) ChildCache(name string) *Cache {
+	return c.SubCache([]byte(name))
 }
 func (c *Cache) Position() *Position {
 	return c.position
@@ -93,35 +99,15 @@ func (c *Cache) OverrideStorage(storage *Storage) *Cache {
 func (c *Cache) Storage() *Storage {
 	return c.storage
 }
-func (c *Cache) IsPreparing() bool {
-	return c.pending != nil
-}
+
 func (c *Cache) CopyFrom(cc *Cache) {
 	Copy(c, cc)
 }
-func (c *Cache) Ready() error {
-	p := c.pending
-	c.pending = nil
-	return p.Resolve(c)
-}
 
-func (c *Cache) Execute(dst *Cache) error {
-	err := c.Ready()
-	if err != nil {
-		return err
-	}
-	dst.CopyFrom(c)
-	return nil
-}
 func New() *Cache {
 	return &Cache{
 		storage: NewStorage(),
 	}
-}
-func Prepare(d ...Directive) *Cache {
-	c := New()
-	c.pending = Pend(d...)
-	return c
 }
 
 func SetCacheStorage(c *Cache, s *Storage) {
@@ -145,9 +131,13 @@ func SetCacheFlushable(c *Cache, flushable bool) {
 func SetCache(c *Cache, dst *Cache) {
 	*c = *dst
 }
-func SetCachePending(c *Cache, p *Pending) {
-	c.pending = p
-}
 func Copy(src *Cache, dst *Cache) {
 	SetCache(src, dst.Clone())
+}
+
+func VirtualCache(s StorageProvider, namespace string) *Cache {
+	c := New()
+	SetCacheStorage(c, s.Storage())
+	SetCacheNamespace(c, []byte(namespace))
+	return c
 }

@@ -12,12 +12,6 @@ type Storage struct {
 	Engine
 }
 
-func (s *Storage) Execute(c *Cache) error {
-	SetCache(c, c.OverrideStorage(s))
-	return nil
-
-}
-
 type NopEngine struct{}
 
 func (s *NopEngine) Start() error {
@@ -45,4 +39,8 @@ func NewStorage() *Storage {
 	return &Storage{
 		Engine: DefaultEngine,
 	}
+}
+
+type StorageProvider interface {
+	Storage() *Storage
 }
