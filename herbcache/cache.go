@@ -50,7 +50,9 @@ func (c *Cache) Migrate(namespace []byte) *Cache {
 	SetCacheGroup(cc, nil)
 	return cc
 }
-
+func (c *Cache) Allocate(name string) *Cache {
+	return c.Migrate([]byte(name))
+}
 func (c *Cache) Namespace() []byte {
 	return c.namespace
 }
@@ -133,11 +135,4 @@ func SetCache(c *Cache, dst *Cache) {
 }
 func Copy(src *Cache, dst *Cache) {
 	SetCache(src, dst.Clone())
-}
-
-func VirtualCache(s StorageProvider, namespace string) *Cache {
-	c := New()
-	SetCacheStorage(c, s.Storage())
-	SetCacheNamespace(c, []byte(namespace))
-	return c
 }

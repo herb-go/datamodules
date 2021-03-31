@@ -40,7 +40,3 @@ func NewStorage() *Storage {
 		Engine: DefaultEngine,
 	}
 }
-
-type StorageProvider interface {
-	Storage() *Storage
-}

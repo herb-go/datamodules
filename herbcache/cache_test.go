@@ -79,7 +79,7 @@ func TestStringCache(t *testing.T) {
 	if !c.SubCache([]byte("sub")).Equal(c.ChildCache("sub")) {
 		t.Fatal()
 	}
-	if !VirtualCache(c, "ns").Equal(c.Migrate([]byte("ns"))) {
+	if !c.Allocate("ns").Equal(c.Migrate([]byte("ns"))) {
 		t.Fatal()
 	}
 }
