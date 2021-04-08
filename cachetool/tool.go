@@ -26,6 +26,8 @@ type LoaderSaver interface {
 
 var DefaultEncoding = msgpackencoding.Encoding
 
+var DefaultTTL = time.Hour
+
 type Tool struct {
 	TTL       time.Duration
 	Cache     herbdata.Cache
@@ -34,5 +36,8 @@ type Tool struct {
 }
 
 func NewTool() *Tool {
-	return &Tool{}
+	return &Tool{
+		TTL:      DefaultTTL,
+		Encoding: DefaultEncoding,
+	}
 }
