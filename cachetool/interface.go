@@ -26,13 +26,13 @@ type LoaderSaver interface {
 
 var DefaultEncoding = msgpackencoding.Encoding
 
-type Settings struct {
+type Tool struct {
 	TTL       time.Duration
 	Cache     herbdata.Cache
 	LockerMap *waitingmap.LockerMap
 	Encoding  *dataencoding.Encoding
 }
 
-func NewSettings() *Settings {
-	return &Settings{}
+func NewTool() *Tool {
+	return &Tool{}
 }
