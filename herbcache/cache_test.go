@@ -83,3 +83,19 @@ func TestStringCache(t *testing.T) {
 		t.Fatal()
 	}
 }
+
+func TestSetCache(t *testing.T) {
+	c := New()
+	dst := New()
+	if c == dst {
+		t.Fatal()
+	}
+	dst = dst.OverrideFlushable(true)
+	SetCache(c, dst)
+	if c == dst {
+		t.Fatal()
+	}
+	if !c.Equal(dst) {
+		t.Fatal()
+	}
+}

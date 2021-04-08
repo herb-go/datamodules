@@ -131,7 +131,11 @@ func SetCacheFlushable(c *Cache, flushable bool) {
 }
 
 func SetCache(c *Cache, dst *Cache) {
-	*c = *dst
+	c.storage = dst.storage
+	c.namespace = dst.namespace
+	c.group = dst.group
+	c.position = dst.position
+	c.flushable = dst.flushable
 }
 func Copy(src *Cache, dst *Cache) {
 	SetCache(src, dst.Clone())
