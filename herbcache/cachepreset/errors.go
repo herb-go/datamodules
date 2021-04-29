@@ -1,4 +1,4 @@
-package cachecommand
+package cachepreset
 
 import "errors"
 
