@@ -18,7 +18,12 @@ func (p *Commands) Concat(cmd ...Command) *Commands {
 	}
 	return preset
 }
-
+func (p *Commands) Length() int {
+	if p == nil {
+		return 0
+	}
+	return p.prev.Length() + 1
+}
 func (p *Commands) Exec(preset *Preset) (*Preset, error) {
 	if p == nil {
 		return preset, nil

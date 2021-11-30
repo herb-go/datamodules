@@ -2,7 +2,7 @@ package cachepreset
 
 import (
 	"github.com/herb-go/datamodules/herbcache"
-	"github.com/herb-go/herbdata"
+	"github.com/herb-go/herbdata/dataencoding"
 )
 
 type Command interface {
@@ -33,58 +33,18 @@ func (t TTL) Exec(preset *Preset) (newpreset *Preset, err error) {
 	return preset.OverrideTTL(int64(t)), nil
 }
 
+func Encoding(e *dataencoding.Encoding) Command {
+	return CommandFunc(func(preset *Preset) (newpreset *Preset, err error) {
+		return preset.OverrideEncoding((*dataencoding.Encoding)(e)), nil
+
+	})
+}
+
 type Loader func([]byte) ([]byte, error)
 
 func (l Loader) Exec(preset *Preset) (newpreset *Preset, err error) {
 	return preset.OverrideLoader(l), nil
 }
-
-var Operate = CommandFunc(func(preset *Preset) (newpreset *Preset, err error) {
-	c := preset.Clone()
-	switch c.operationCode {
-	case OperationCodeDelete:
-		err = c.cache.Delete(preset.key)
-		if err != nil {
-			return nil, err
-		}
-	case OperationCodeFlush:
-		err = c.cache.Flush()
-		if err != nil {
-			return nil, err
-		}
-		return c, nil
-	case OperationCodeSetWithTTL:
-		err = c.cache.SetWithTTL(c.key, c.data, c.ttl)
-		if err != nil {
-			return nil, err
-		}
-		return c, nil
-	case OperationCodeGet:
-		data, err := preset.cache.Get(c.key)
-		if err == nil {
-			c.data = data
-			return c, nil
-		}
-		if c.loader == nil {
-			return nil, err
-		}
-		if err != herbdata.ErrNotFound {
-			return nil, err
-		}
-		data, err = c.loader(c.key)
-		if err != nil {
-			return nil, err
-		}
-		if c.ttl != 0 {
-			err = c.cache.SetWithTTL(c.key, data, c.ttl)
-			if err != nil {
-				return nil, err
-			}
-		}
-		return c, nil
-	}
-	return nil, ErrUnknownOperation
-})
 
 func Cache(cache *herbcache.Cache) Command {
 	return CommandFunc(func(preset *Preset) (newpreset *Preset, err error) {
@@ -113,5 +73,5 @@ func (c ChildCache) Exec(preset *Preset) (newpreset *Preset, err error) {
 type PrefixCache string
 
 func (p PrefixCache) Exec(preset *Preset) (newpreset *Preset, err error) {
-	return preset.OverrideCache(preset.cache.ChildCache(string(p))), nil
+	return preset.OverrideCache(preset.cache.PrefixCache(string(p))), nil
 }
