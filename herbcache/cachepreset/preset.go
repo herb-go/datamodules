@@ -186,7 +186,7 @@ func (p *Preset) get(key []byte) (*Preset, error) {
 		preset.lockers.m.Unlock(string(key))
 		needunlock = false
 	}
-	if preset.ttl != 0 {
+	if preset.ttl > 0 {
 		err = preset.cache.SetWithTTL(preset.key, preset.data, preset.ttl)
 		if err != nil {
 			return nil, err
