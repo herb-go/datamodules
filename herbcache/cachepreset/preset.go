@@ -186,13 +186,13 @@ func (p *Preset) get(key []byte) (*Preset, error) {
 		preset.lockers.m.Unlock(string(key))
 		needunlock = false
 	}
+	preset.data = data
 	if preset.ttl > 0 {
 		err = preset.cache.SetWithTTL(preset.key, preset.data, preset.ttl)
 		if err != nil {
 			return nil, err
 		}
 	}
-	preset.data = data
 	return preset, nil
 }
 func (p *Preset) GetS(key []byte) ([]byte, error) {
