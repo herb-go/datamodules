@@ -6,6 +6,7 @@ import (
 
 	"github.com/herb-go/datamodules/herbcache"
 	"github.com/herb-go/herbdata/dataencoding"
+	"github.com/herb-go/herbdata/dataencoding/msgpackencoding"
 )
 
 func TestOverride(t *testing.T) {
@@ -70,6 +71,18 @@ func TestClone(t *testing.T) {
 	}
 	p.data = []byte("12345")
 	if bytes.Compare(p.data, p2.data) == 0 {
+		t.Fatal()
+	}
+}
+
+func TestExec(t *testing.T) {
+	p := New()
+	p2 := New().OverrideEncoding(msgpackencoding.Encoding).OverrideKey([]byte("key")).OverrideTTL(100)
+	preset, err := p.Concat(p2).Apply()
+	if err != nil {
+		t.Fatal()
+	}
+	if preset.Encoding() != msgpackencoding.Encoding || string(preset.Key()) != "key" || preset.TTL() != 100 {
 		t.Fatal()
 	}
 }

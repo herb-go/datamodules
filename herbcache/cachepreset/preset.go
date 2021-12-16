@@ -19,9 +19,7 @@ type Preset struct {
 }
 
 func (p *Preset) Exec(preset *Preset) (*Preset, error) {
-	newpreset := p.Clone()
-	newpreset.commands = preset.commands.Concat(p.commands)
-	return newpreset, nil
+	return p.Apply()
 }
 
 func (p *Preset) Lockers() *Lockers {
@@ -128,7 +126,7 @@ func (p *Preset) Delete(key []byte) error {
 	if err != nil {
 		return err
 	}
-	return p.cache.Delete(preset.key)
+	return preset.cache.Delete(preset.key)
 }
 func (p *Preset) DeleteS(key string) error {
 	return p.Delete([]byte(key))
@@ -195,7 +193,7 @@ func (p *Preset) get(key []byte) (*Preset, error) {
 	}
 	return preset, nil
 }
-func (p *Preset) GetS(key []byte) ([]byte, error) {
+func (p *Preset) GetS(key string) ([]byte, error) {
 	return p.Get([]byte(key))
 }
 func (p *Preset) SetWithTTL(key []byte, data []byte, ttl int64) error {
@@ -207,6 +205,20 @@ func (p *Preset) SetWithTTL(key []byte, data []byte, ttl int64) error {
 }
 func (p *Preset) SetWithTTLS(key string, data []byte, ttl int64) error {
 	return p.SetWithTTL([]byte(key), data, ttl)
+}
+func (p *Preset) Store(key []byte, v interface{}, ttl int64) error {
+	preset, err := p.Apply()
+	if err != nil {
+		return err
+	}
+	data, err := preset.Encoding().Marshal(v)
+	if err != nil {
+		return err
+	}
+	return preset.SetWithTTL(key, data, ttl)
+}
+func (p *Preset) StoreS(key string, v interface{}, ttl int64) error {
+	return p.Store([]byte(key), v, ttl)
 }
 func (p *Preset) Load(key []byte, v interface{}) error {
 	preset, err := p.get(key)
