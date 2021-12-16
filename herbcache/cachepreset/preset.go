@@ -90,6 +90,7 @@ func (p *Preset) Clone() *Preset {
 		key:      p.key,
 		data:     p.data,
 		loader:   p.loader,
+		lockers:  p.lockers,
 	}
 }
 

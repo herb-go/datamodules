@@ -2,7 +2,10 @@ package cachepreset_test
 
 import (
 	"encoding/json"
+	"sort"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/herb-go/datamodules/herbcache"
 	"github.com/herb-go/datamodules/herbcache/cachepreset"
@@ -134,5 +137,74 @@ func TestOperation(t *testing.T) {
 	err = cc2.LoadS("test2", &result)
 	if err != herbdata.ErrNotFound {
 		t.Fatal(err)
+	}
+}
+
+var loaded = int(0)
+var loaderlock sync.Mutex
+
+var TestLoader = func([]byte) ([]byte, error) {
+	loaderlock.Lock()
+	defer loaderlock.Unlock()
+	loaded++
+	time.Sleep(1 * time.Millisecond)
+	return msgpackencoding.Encoding.Marshal(loaded)
+}
+
+func TestLoad(t *testing.T) {
+	cache := testcache()
+	enc := msgpackencoding.Encoding
+	preset, err := cachepreset.New(cachepreset.Cache(cache), cachepreset.Encoding(enc), cachepreset.TTL(100), cachepreset.Loader(TestLoader)).Apply()
+	if err != nil {
+		t.Fatal()
+	}
+	var data int
+	err = preset.LoadS("key", &data)
+	if err != nil || data != 1 {
+		t.Fatal(data, err)
+	}
+	err = preset.Flush()
+	if err != nil {
+		t.Fatal()
+	}
+	loaded = 0
+	var datas = make([]int, 5)
+	for i := 0; i < 5; i++ {
+		var index = i
+		go func() {
+			err = preset.LoadS("key", &datas[index])
+			if err != nil {
+				panic(err)
+			}
+		}()
+	}
+	time.Sleep(100 * time.Millisecond)
+	sort.Ints(datas)
+	if loaded != 5 || datas[4] != 5 {
+		t.Fatal(loaded, datas)
+	}
+	preset, err = preset.Concat(cachepreset.NewLockers()).Apply()
+	if err != nil {
+		t.Fatal()
+	}
+	loaded = 0
+	datas = make([]int, 5)
+	err = preset.Flush()
+	if err != nil {
+		t.Fatal()
+	}
+	for i := 0; i < 5; i++ {
+		var index = i
+		go func() {
+			err = preset.LoadS("key", &datas[index])
+			if err != nil {
+				panic(err)
+			}
+		}()
+	}
+	time.Sleep(100 * time.Millisecond)
+	sort.Ints(datas)
+	if loaded != 1 || datas[4] != 1 {
+		t.Fatal(datas)
 	}
 }
